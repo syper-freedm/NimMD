@@ -1,0 +1,65 @@
+# Инварианты NimMD, которые не ловят clippy и ESLint. Запуск: just semgrep.
+# Правило ослабляется только точечным `nosemgrep: <id>` с причиной рядом.
+rules:
+  - id: nimmd-core-no-io
+    message: "nimmd-core не трогает ФС, сеть и процессы (спек 5.1): строка на входе, Rendered на выходе"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      include: ["/crates/nimmd-core/src/**"]
+    pattern-regex: '\bstd::(fs|net|process)\b'
+
+  - id: nimmd-comrak-raw-html
+    message: "Сырой HTML из Markdown в превью запрещён: comrak только с render.unsafe_ = false, иначе XSS в WebView"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      include: ["*.rs"]
+    pattern-regex: '\b(r#unsafe|unsafe_)\s*[:=]\s*true\b'
+
+  - id: nimmd-dom-html-sink
+    message: "HTML в DOM вставляется только через DOM API (createElement, DOMParser + importNode) или textContent; строку из документа в innerHTML не писать"
+    severity: ERROR
+    languages: [typescript, javascript]
+    paths:
+      exclude: ["/packages/vendor/**", "node_modules/"]
+    patterns:
+      - pattern-either:
+          - pattern: $E.innerHTML = $V
+          - pattern: $E.outerHTML = $V
+          - pattern: $E.insertAdjacentHTML(...)
+          - pattern: document.write(...)
+          - pattern: document.writeln(...)
+      - pattern-not: $E.innerHTML = ""
+
+  - id: nimmd-mermaid-strict
+    message: "mermaid.initialize без securityLevel: 'strict' — диаграмма из чужого файла может выполнить скрипт"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      exclude: ["/packages/vendor/**", "node_modules/", "*.min.js"]
+    pattern-regex: 'mermaid\.initialize\(\{\{?(?![^}]*securityLevel\s*:\s*[''"]strict[''"])'
+
+  - id: nimmd-katex-trust
+    message: "KaTeX только с trust: false: \\href и \\htmlData из чужого файла иначе дают javascript:-ссылки"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      exclude: ["/packages/vendor/**", "node_modules/", "*.min.js"]
+    pattern-regex: '\btrust\s*:\s*true\b'
+
+  - id: nimmd-tauri-csp-off
+    message: "CSP WebView не отключается и не ослабляется: документ в WebView недоверенный"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      include: ["/apps/desktop/src-tauri/**"]
+    pattern-regex: '"(csp|devCsp)"\s*:\s*null|"dangerousDisableAssetCspModification"\s*:\s*true|unsafe-eval'
+
+  - id: nimmd-tauri-plugin-capability
+    message: "WebView не получает fs/shell/process/http: файл читает и пишет Rust-команда из app/. Если плагин нужен — узкий scope и nosemgrep с причиной"
+    severity: ERROR
+    languages: [regex]
+    paths:
+      include: ["/apps/desktop/src-tauri/capabilities/**"]
+    pattern-regex: '"(fs|shell|process|http):[a-z-]+"'

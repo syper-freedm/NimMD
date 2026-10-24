@@ -25,3 +25,4 @@ AGENTS.*
 CLAUDE.*
 .remember/
 .DS_Store
+node_modules/

@@ -1,0 +1,23 @@
+[advisories]
+yanked = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+[licenses]
+allow = ["MIT", "MIT-0", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause",
+         "ISC", "0BSD", "Zlib", "BSL-1.0", "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "Unlicense",
+         "CDLA-Permissive-2.0"]
+confidence-threshold = 0.9
+# Список совпадает со спекой 12 заранее: лицензии, которых ещё нет в зависимостях, не шумят
+unused-allowed-license = "allow"
+exceptions = [
+  { allow = ["MPL-2.0"], crate = "cssparser" }, { allow = ["MPL-2.0"], crate = "cssparser-macros" },
+  { allow = ["MPL-2.0"], crate = "selectors" }, { allow = ["MPL-2.0"], crate = "dtoa-short" },
+  { allow = ["MPL-2.0"], crate = "option-ext" }, { allow = ["MPL-2.0"], crate = "cbindgen" },
+]
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
