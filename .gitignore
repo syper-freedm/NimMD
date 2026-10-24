@@ -26,3 +26,6 @@ CLAUDE.*
 .remember/
 .DS_Store
 node_modules/
+
+# Машинное состояние конвейера AFD (локально)
+tasks/*/control/
