@@ -259,6 +259,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nimmd-assets"
+version = "0.1.0"
+
+[[package]]
 name = "nimmd-core"
 version = "0.1.0"
 dependencies = [
