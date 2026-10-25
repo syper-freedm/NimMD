@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use nimmd_core::profile::Dialect;
 use nimmd_core::text::{
-    LineEnding, MAX_BYTES, MAX_NESTING, detect_line_ending, frontmatter_dialect, limit_nesting,
-    normalize_newlines, split_frontmatter, strip_bom, truncate_at_char_boundary,
+    LineEnding, MAX_BYTES, MAX_NESTING, decode_lossy, detect_line_ending, frontmatter_dialect,
+    limit_nesting, normalize_newlines, split_frontmatter, strip_bom, truncate_at_char_boundary,
 };
 
 #[test]
@@ -364,4 +364,25 @@ fn limit_nesting_is_lossless_and_idempotent() {
             "{src:?}"
         );
     }
+}
+
+#[test]
+fn decode_lossy_replaces_invalid_bytes() {
+    let (text, replaced) = decode_lossy(b"ok \xff\n");
+    assert_eq!(text, "ok \u{FFFD}\n");
+    assert!(replaced);
+    assert_eq!(decode_lossy(b"ok\n"), (Cow::Borrowed("ok\n"), false));
+    assert_eq!(decode_lossy(b""), (Cow::Borrowed(""), false));
+    assert!(matches!(
+        decode_lossy("ж\u{1F600}".as_bytes()),
+        (Cow::Borrowed("ж\u{1F600}"), false)
+    ));
+    // Обрезанный многобайтовый символ и одиночный байт продолжения
+    assert_eq!(
+        decode_lossy(b"\xd0"),
+        (Cow::Owned("\u{FFFD}".to_owned()), true)
+    );
+    assert_eq!(decode_lossy(b"a\x80b").0, "a\u{FFFD}b");
+    // Исходный текст с U+FFFD — не замена
+    assert!(!decode_lossy("\u{FFFD}".as_bytes()).1);
 }

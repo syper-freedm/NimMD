@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::data::{FileKind, push_data};
 use crate::detect::profile_of;
 use crate::profile::Profile;
 use crate::render::{MathMode, highlight_yaml, push_escaped, render_body};
@@ -12,6 +13,7 @@ use crate::text::{
 
 const THEME_CSS: &str = include_str!("../../../packages/theme/nimmd.css");
 const HIGHLIGHT_CSS: &str = include_str!("../../../packages/theme/highlight.css");
+const DATA_CSS: &str = include_str!("../../../packages/theme/data.css");
 const KATEX_INIT: &str = include_str!("../../../packages/theme/katex-init.js");
 const MERMAID_INIT: &str = include_str!("../../../packages/theme/mermaid-init.js");
 
@@ -56,6 +58,8 @@ pub struct RenderOptions {
     pub max_bytes: usize,
     /// `None` — профиль определяет детектор.
     pub profile: Option<Profile>,
+    /// Не `Markdown` — файл данных: без frontmatter, профиля и скриптов.
+    pub kind: FileKind,
 }
 
 impl Default for RenderOptions {
@@ -68,6 +72,7 @@ impl Default for RenderOptions {
             not_utf8: false,
             max_bytes: MAX_BYTES,
             profile: None,
+            kind: FileKind::Markdown,
         }
     }
 }
@@ -78,7 +83,7 @@ impl Default for RenderOptions {
 pub struct Rendered {
     /// Документ целиком.
     pub html: String,
-    /// `<main class="nimmd">…</main>` — та же подстрока, что в `html`.
+    /// `<main class="nimmd">…</main>` (у данных — `nimmd nimmd-data`) — та же подстрока, что в `html`.
     pub body: String,
     pub profile: Profile,
     /// Frontmatter с разделителями, переносы `\n`.
@@ -88,6 +93,8 @@ pub struct Rendered {
     pub truncated: bool,
     /// Текст первого заголовка уровня 1.
     pub title: Option<String>,
+    /// Файл данных длиннее `HIGHLIGHT_LIMIT`: подсвечена только голова.
+    pub highlight_limited: bool,
 }
 
 /// Полный HTML-документ из исходного текста.
@@ -98,24 +105,36 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
     let line_ending = detect_line_ending(src);
     let src = normalize_newlines(src);
     let (src, truncated) = truncate_at_char_boundary(&src, opts.max_bytes);
-    let (frontmatter, text) = split_frontmatter(src);
-    let parsed = render_body(text, opts.math, opts.remote_images);
-    let profile = opts
-        .profile
-        .unwrap_or_else(|| profile_of(frontmatter, text, parsed.math, parsed.mermaid));
+    let markdown = opts.kind == FileKind::Markdown;
 
-    let mut body = String::from("<main class=\"nimmd\">");
+    let mut body = String::from("<main class=\"nimmd");
+    if !markdown {
+        body.push_str(" nimmd-data\" data-kind=\"");
+        body.push_str(opts.kind.name());
+    }
+    body.push_str("\">");
     if opts.not_utf8 {
         body.push_str(
             "<div class=\"banner not-utf8\">Файл не в UTF-8: нераспознанные байты заменены знаком \u{FFFD}</div>",
         );
     }
-    if let Some(fm) = frontmatter {
-        body.push_str("<pre class=\"frontmatter\">");
-        highlight_yaml(&mut body, yaml_of(fm));
-        body.push_str("</pre>");
-    }
-    body.push_str(&parsed.html);
+    let (frontmatter, profile, title, highlight_limited) = if markdown {
+        let (frontmatter, text) = split_frontmatter(src);
+        let parsed = render_body(text, opts.math, opts.remote_images);
+        let profile = opts
+            .profile
+            .unwrap_or_else(|| profile_of(frontmatter, text, parsed.math, parsed.mermaid));
+        if let Some(fm) = frontmatter {
+            body.push_str("<pre class=\"frontmatter\">");
+            highlight_yaml(&mut body, yaml_of(fm));
+            body.push_str("</pre>");
+        }
+        body.push_str(&parsed.html);
+        (frontmatter, profile, parsed.title, false)
+    } else {
+        let limited = push_data(&mut body, opts.kind, src);
+        (None, Profile::default(), None, limited)
+    };
     if truncated {
         let shown = if opts.max_bytes < MIB {
             format!("{} байт", opts.max_bytes)
@@ -137,7 +156,7 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
         "<!doctype html><html data-theme=\"{theme}\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
     );
-    if let Some(title) = &parsed.title {
+    if let Some(title) = &title {
         html.push_str("<title>");
         push_escaped(&mut html, title);
         html.push_str("</title>");
@@ -145,9 +164,14 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
     html.push_str("<style>");
     html.push_str(THEME_CSS);
     html.push_str(HIGHLIGHT_CSS);
+    if !markdown {
+        html.push_str(DATA_CSS);
+    }
     html.push_str("</style>");
-    let katex = profile.features.math && opts.math == MathMode::Katex;
-    push_assets(&mut html, &opts.assets, katex, profile.features.mermaid);
+    if markdown {
+        let katex = profile.features.math && opts.math == MathMode::Katex;
+        push_assets(&mut html, &opts.assets, katex, profile.features.mermaid);
+    }
     html.push_str("</head><body>");
     html.push_str(&body);
     html.push_str("</body></html>");
@@ -160,7 +184,8 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
         line_ending,
         had_bom,
         truncated,
-        title: parsed.title,
+        title,
+        highlight_limited,
     }
 }
 

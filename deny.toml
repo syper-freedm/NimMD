@@ -7,6 +7,8 @@ yanked = "deny"
 ignore = [
   # bincode 1.3.3 заброшен, но авторы считают версию завершённой; syntect читает им только встроенные дампы синтаксисов, не документ
   { id = "RUSTSEC-2025-0141", reason = "bincode в syntect декодирует только встроенные в бинарь дампы" },
+  # yaml-rust заброшен; подключён фичей yaml-load syntect только в dev-dependencies ядра: examples/build_syntaxes.rs читает им грамматики из репозитория
+  { id = "RUSTSEC-2024-0320", reason = "yaml-rust только в dev-сборке дампа синтаксисов, в продукт не попадает" },
 ]
 
 [sources]

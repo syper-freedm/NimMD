@@ -48,3 +48,7 @@ secrets:
 workflows:
     actionlint
     zizmor --offline .github/workflows
+
+# Встроенный дамп синтаксисов ядра: стандартный набор syntect и crates/nimmd-core/assets/syntaxes/
+syntaxes:
+    cargo run -p nimmd-core --example build_syntaxes

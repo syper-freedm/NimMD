@@ -1,0 +1,51 @@
+/* Файлы данных: <pre class="data"> и цвета столбцов CSV (.c0….c7, разделитель .d).
+   Контраст WCAG — к худшему из фонов --bg и --bg-subtle темы (<pre> лежит на --bg-subtle). */
+:root {
+  --csv-0: #cf222e; /* 5.03:1 */
+  --csv-1: #0550ae; /* 7.13:1 */
+  --csv-2: #116329; /* 6.94:1 */
+  --csv-3: #8250df; /* 4.74:1 */
+  --csv-4: #953800; /* 6.94:1 */
+  --csv-5: #1b7c83; /* 4.63:1 */
+  --csv-6: #bf3989; /* 4.74:1 */
+  --csv-7: #7d4e00; /* 6.66:1 */
+  --csv-delim: #59636e; /* 5.74:1 */
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --csv-0: #ff7b72; /* 6.87:1 */
+    --csv-1: #79c0ff; /* 8.90:1 */
+    --csv-2: #7ee787; /* 11.27:1 */
+    --csv-3: #d2a8ff; /* 8.89:1 */
+    --csv-4: #ffa657; /* 8.94:1 */
+    --csv-5: #56d4dd; /* 9.78:1 */
+    --csv-6: #ff9bce; /* 8.93:1 */
+    --csv-7: #e3b341; /* 8.90:1 */
+    --csv-delim: #9198a1; /* 5.94:1 */
+  }
+}
+
+[data-theme="dark"] {
+  --csv-0: #ff7b72;
+  --csv-1: #79c0ff;
+  --csv-2: #7ee787;
+  --csv-3: #d2a8ff;
+  --csv-4: #ffa657;
+  --csv-5: #56d4dd;
+  --csv-6: #ff9bce;
+  --csv-7: #e3b341;
+  --csv-delim: #9198a1;
+}
+
+[data-kind="text"] pre.data { white-space: pre-wrap; }
+
+.c0 { color: var(--csv-0); }
+.c1 { color: var(--csv-1); }
+.c2 { color: var(--csv-2); }
+.c3 { color: var(--csv-3); }
+.c4 { color: var(--csv-4); }
+.c5 { color: var(--csv-5); }
+.c6 { color: var(--csv-6); }
+.c7 { color: var(--csv-7); }
+.d { color: var(--csv-delim); }

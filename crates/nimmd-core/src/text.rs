@@ -20,6 +20,13 @@ pub enum LineEnding {
     CrLf,
 }
 
+/// Байты в текст с заменой невалидных последовательностей на `U+FFFD`; `true`, если замены были.
+pub fn decode_lossy(bytes: &[u8]) -> (Cow<'_, str>, bool) {
+    let text = String::from_utf8_lossy(bytes);
+    let replaced = matches!(text, Cow::Owned(_));
+    (text, replaced)
+}
+
 /// Отрезает один ведущий BOM (`U+FEFF`); `true`, если он был.
 pub fn strip_bom(src: &str) -> (bool, &str) {
     src.strip_prefix('\u{FEFF}')
