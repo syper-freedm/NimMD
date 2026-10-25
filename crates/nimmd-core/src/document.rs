@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::detect::profile_of;
 use crate::profile::Profile;
-use crate::render::{highlight_yaml, push_escaped, render_body};
+use crate::render::{MathMode, highlight_yaml, push_escaped, render_body};
 use crate::text::{
     LineEnding, MAX_BYTES, detect_line_ending, normalize_newlines, split_frontmatter, strip_bom,
     truncate_at_char_boundary,
@@ -25,19 +25,6 @@ pub enum Theme {
     Auto,
     Light,
     Dark,
-}
-
-/// Вывод формул.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MathMode {
-    /// `<span data-math-style>` для KaTeX на стороне хоста.
-    #[default]
-    Katex,
-    /// MathML без скриптов.
-    MathML,
-    /// Экранированный TeX.
-    Source,
 }
 
 /// Подключение KaTeX и Mermaid в `<head>`.

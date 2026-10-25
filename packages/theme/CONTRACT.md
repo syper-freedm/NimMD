@@ -31,3 +31,4 @@
 - `truncated`
 - `not-utf8`
 - `remote-image`
+- `math-display`

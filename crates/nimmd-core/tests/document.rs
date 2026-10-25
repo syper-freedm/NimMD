@@ -353,11 +353,50 @@ fn math_source_mode() {
     let body = render(FORMULAS, &with_math(MathMode::Source)).body;
     assert!(body.contains("<code>x^2</code>"), "{body}");
     assert!(
-        body.contains("<pre><code>\\frac{a}{b}</code></pre>"),
+        body.contains("<p><code class=\"math-display\">\\frac{a}{b}</code></p>"),
         "{body}"
     );
+    assert!(!body.contains("<pre"), "{body}");
     assert!(!body.contains("data-math-style"), "{body}");
     assert!(!body.contains("<math"), "{body}");
+    // Класс формулы — из списка «Только ядра» и есть в выводе
+    assert!(contract_list("Только ядра").contains(&"math-display"));
+    assert!(html_classes(&body).contains(&"math-display"), "{body}");
+    insta::assert_snapshot!(body);
+}
+
+#[test]
+fn display_math_has_no_pre_in_any_mode() {
+    let unsupported = "$$\\nosuchcommand{x}$$\n";
+    for mode in [MathMode::Katex, MathMode::MathML, MathMode::Source] {
+        for src in [FORMULAS, unsupported] {
+            let body = render(src, &with_math(mode)).body;
+            assert!(!body.contains("<pre"), "{mode:?} {src}: {body}");
+        }
+    }
+    let body = render(unsupported, &with_math(MathMode::MathML)).body;
+    assert!(
+        body.contains("<code class=\"math-display\">\\nosuchcommand{x}</code>"),
+        "{body}"
+    );
+}
+
+#[test]
+fn dangerous_display_formulas_escaped_in_source() {
+    for (src, expected) in [
+        (
+            "$$\\text{<script>}$$",
+            "<code class=\"math-display\">\\text{&lt;script&gt;}</code>",
+        ),
+        (
+            "$$a<b&c$$",
+            "<code class=\"math-display\">a&lt;b&amp;c</code>",
+        ),
+    ] {
+        let body = render(src, &with_math(MathMode::Source)).body;
+        assert!(!body.contains("<script"), "{src}: {body}");
+        assert!(body.contains(expected), "{src}: {body}");
+    }
 }
 
 #[test]

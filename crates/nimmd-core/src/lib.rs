@@ -9,5 +9,5 @@ mod render;
 pub mod text;
 
 pub use detect::detect;
-pub use document::{AssetMode, MathMode, RenderOptions, Rendered, Theme, render};
-pub use render::render_fragment;
+pub use document::{AssetMode, RenderOptions, Rendered, Theme, render};
+pub use render::{MathMode, render_fragment};

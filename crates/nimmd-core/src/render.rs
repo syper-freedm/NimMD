@@ -11,17 +11,30 @@ use comrak::options::Plugins;
 use comrak::{Arena, format_html_with_plugins, html, parse_document};
 use latex2mathml::token::Token;
 use latex2mathml::{DisplayStyle, latex_to_mathml};
+use serde::{Deserialize, Serialize};
 use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 
 use crate::detect::ast_features;
-use crate::document::MathMode;
 use crate::parse;
 use crate::text::{MAX_NESTING, limit_nesting};
 
 /// Предел длины формулы для `latex2mathml` в байтах.
 const MAX_TEX_BYTES: usize = 10_000;
+
+/// Вывод формул.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MathMode {
+    /// `<span data-math-style>` для KaTeX на стороне хоста.
+    #[default]
+    Katex,
+    /// MathML без скриптов.
+    MathML,
+    /// Экранированный TeX.
+    Source,
+}
 
 /// HTML-фрагмент тела документа (без frontmatter).
 ///
@@ -136,16 +149,17 @@ fn math_html(formula: &NodeMath, mode: MathMode) -> Option<String> {
     }
 }
 
-/// Экранированный TeX: inline — `<code>`, display — `<pre><code>`.
+/// Экранированный TeX: inline — `<code>`, display — `<code class="math-display">`.
+///
+/// Без `<pre>`: формула стоит внутри `<p>`, а `<pre>` в `<p>` браузер выносит из абзаца.
 fn source(formula: &NodeMath) -> String {
-    let (open, close) = if formula.display_math {
-        ("<pre><code>", "</code></pre>")
+    let mut out = String::from(if formula.display_math {
+        "<code class=\"math-display\">"
     } else {
-        ("<code>", "</code>")
-    };
-    let mut out = String::from(open);
+        "<code>"
+    });
     push_escaped(&mut out, &formula.literal);
-    out.push_str(close);
+    out.push_str("</code>");
     out
 }
 

@@ -1,0 +1,7 @@
+---
+source: crates/nimmd-core/tests/document.rs
+expression: body
+---
+<main class="nimmd"><p><code>x^2</code></p>
+<p><code class="math-display">\frac{a}{b}</code></p>
+</main>
