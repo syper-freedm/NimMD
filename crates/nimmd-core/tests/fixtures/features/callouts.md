@@ -1,0 +1,3 @@
+> [!NOTE] a
+
+> [!warning] b

@@ -1,0 +1,14 @@
+{
+  "dialect": "commonmark",
+  "features": {
+    "frontmatter": false,
+    "math": false,
+    "mermaid": false,
+    "footnotes": false,
+    "tables": false,
+    "tasklists": false,
+    "strikethrough": false,
+    "wikilinks": false,
+    "callouts": false
+  }
+}

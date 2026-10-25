@@ -1,0 +1,14 @@
+{
+  "dialect": "gfm",
+  "features": {
+    "frontmatter": true,
+    "math": false,
+    "mermaid": false,
+    "footnotes": false,
+    "tables": false,
+    "tasklists": false,
+    "strikethrough": false,
+    "wikilinks": true,
+    "callouts": false
+  }
+}

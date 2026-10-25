@@ -12,6 +12,7 @@ name = "nimmd_core"
 workspace = true
 
 [dependencies]
+comrak = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]

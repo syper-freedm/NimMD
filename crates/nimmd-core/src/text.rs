@@ -103,3 +103,52 @@ pub fn truncate_at_char_boundary(src: &str, max: usize) -> (&str, bool) {
         .unwrap_or(0);
     (src.get(..end).unwrap_or(""), true)
 }
+
+/// Предел вложенности контейнеров (`>` и маркеров списка) в префиксе строки (спек 5.2).
+pub const MAX_NESTING: usize = 64;
+
+/// Вставляет `\` перед маркером контейнера сверх [`MAX_NESTING`] в префиксе каждой строки.
+///
+/// Без разбора comrak квадратичен по глубине вложенности. Остаток строки становится текстом,
+/// символы исходника не теряются; без таких строк возвращает исходную строку без копирования.
+pub fn limit_nesting(src: &str) -> Cow<'_, str> {
+    let mut out = String::new();
+    let (mut copied, mut line_start) = (0, 0);
+    for line in src.split_inclusive('\n') {
+        if let Some(at) = overflow_marker(line) {
+            out.push_str(src.get(copied..line_start + at).unwrap_or(""));
+            out.push('\\');
+            copied = line_start + at;
+        }
+        line_start += line.len();
+    }
+    if out.is_empty() {
+        return Cow::Borrowed(src);
+    }
+    out.push_str(src.get(copied..).unwrap_or(""));
+    Cow::Owned(out)
+}
+
+/// Байтовое смещение маркера с номером `MAX_NESTING + 1` в префиксе строки.
+fn overflow_marker(line: &str) -> Option<usize> {
+    let mut rest = line;
+    for _ in 0..MAX_NESTING {
+        rest = container_marker(rest.trim_start_matches([' ', '\t']))?;
+    }
+    let tail = rest.trim_start_matches([' ', '\t']);
+    container_marker(tail).map(|_| line.len() - tail.len())
+}
+
+/// Остаток после маркера контейнера в начале `s`: `>` или `-`, `*`, `+`, `N.`, `N)` с пробелом либо концом строки.
+fn container_marker(s: &str) -> Option<&str> {
+    if let Some(rest) = s.strip_prefix('>') {
+        return Some(rest);
+    }
+    let rest = s.strip_prefix(['-', '*', '+']).or_else(|| {
+        let digits = s.trim_start_matches(|c: char| c.is_ascii_digit());
+        (digits.len() < s.len())
+            .then(|| digits.strip_prefix(['.', ')']))
+            .flatten()
+    })?;
+    (rest.is_empty() || rest.starts_with([' ', '\t', '\n', '\r'])).then_some(rest)
+}

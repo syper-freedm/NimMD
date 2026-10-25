@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use nimmd_core::profile::Dialect;
 use nimmd_core::text::{
-    LineEnding, MAX_BYTES, detect_line_ending, frontmatter_dialect, normalize_newlines,
-    split_frontmatter, strip_bom, truncate_at_char_boundary,
+    LineEnding, MAX_BYTES, MAX_NESTING, detect_line_ending, frontmatter_dialect, limit_nesting,
+    normalize_newlines, split_frontmatter, strip_bom, truncate_at_char_boundary,
 };
 
 #[test]
@@ -146,6 +146,61 @@ fn truncate_at_char_boundary_cases() {
     assert_eq!(MAX_BYTES, 10_485_760);
 }
 
+#[test]
+fn limit_nesting_deep_prefix() {
+    assert_eq!(MAX_NESTING, 64);
+    for (marker, src) in [
+        (">", ">".repeat(60_000) + "x"),
+        ("- ", "- ".repeat(60_000) + "x"),
+    ] {
+        let limited = limit_nesting(&src);
+        let (head, tail) = limited.split_once('\\').unwrap();
+        assert_eq!(head, marker.repeat(MAX_NESTING));
+        assert_eq!(head.to_owned() + tail, src);
+        assert!(!tail.contains('\\'));
+    }
+}
+
+#[test]
+fn limit_nesting_boundary() {
+    let at_limit = "> ".repeat(MAX_NESTING) + "x\n";
+    assert!(matches!(limit_nesting(&at_limit), Cow::Borrowed(_)));
+    let over = "> ".repeat(MAX_NESTING + 1) + "x\n";
+    assert_eq!(limit_nesting(&over), "> ".repeat(MAX_NESTING) + "\\> x\n");
+    for src in ["> > > текст", "", "\n", "-x -x -x", ">"] {
+        assert!(matches!(limit_nesting(src), Cow::Borrowed(_)), "{src:?}");
+    }
+}
+
+#[test]
+fn limit_nesting_mixed_markers_and_lines() {
+    let markers = ["> ", "- ", "* ", "+ ", "1. ", "23) ", ">\t", "-\t"];
+    let prefix: String = (0..=MAX_NESTING)
+        .map(|i| markers[i % markers.len()])
+        .collect();
+    let line = prefix.clone() + "текст";
+    let src = format!("a\n{line}\nb\n{line}");
+    let limited = limit_nesting(&src);
+    assert_eq!(limited.matches('\\').count(), 2);
+    assert_eq!(limited.replace('\\', ""), src);
+    let cut: String = (0..MAX_NESTING)
+        .map(|i| markers[i % markers.len()])
+        .collect();
+    let expected_line = format!("{cut}\\{}текст", markers[MAX_NESTING % markers.len()]);
+    assert_eq!(limited, format!("a\n{expected_line}\nb\n{expected_line}"));
+    // Маркер списка без пробела после него — не маркер: префикс обрывается.
+    let broken = "> ".repeat(10) + "-x " + &"> ".repeat(MAX_NESTING);
+    assert!(matches!(limit_nesting(&broken), Cow::Borrowed(_)));
+    // Префикс с пробелами и табуляцией между маркерами и концом строки на маркере.
+    let trailing = ">  \t".repeat(MAX_NESTING + 1);
+    assert_eq!(
+        limit_nesting(&trailing),
+        ">  \t".repeat(MAX_NESTING) + "\\>  \t"
+    );
+    let crlf = "- ".repeat(MAX_NESTING) + "-\r\nx";
+    assert_eq!(limit_nesting(&crlf), "- ".repeat(MAX_NESTING) + "\\-\r\nx");
+}
+
 /// Детерминированный генератор (xorshift64), чтобы падение воспроизводилось.
 struct Rng(u64);
 
@@ -261,5 +316,35 @@ fn functions_are_total_and_match_reference() {
                 .unwrap_or(0);
             assert_eq!(cut.len(), longest.min(src.len()), "{src:?} {max}");
         }
+    }
+}
+
+#[test]
+fn limit_nesting_is_lossless_and_idempotent() {
+    const PIECES: [&str; 9] = [">", "> ", "- ", "1. ", "+", " ", "\t", "x", "\n"];
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    for _ in 0..2000 {
+        let chunks = rng.next() % 12;
+        let src: String = (0..chunks)
+            .map(|_| {
+                let piece = PIECES[usize::try_from(rng.next() % 9).unwrap()];
+                piece.repeat(usize::try_from(rng.next() % 70).unwrap())
+            })
+            .collect();
+        let limited = limit_nesting(&src);
+        assert_eq!(limited.replace('\\', ""), src, "{src:?}");
+        assert_eq!(
+            matches!(limited, Cow::Borrowed(_)),
+            limited == src,
+            "{src:?}"
+        );
+        assert!(
+            limited.lines().all(|line| line.matches('\\').count() <= 1),
+            "{src:?}"
+        );
+        assert!(
+            matches!(limit_nesting(&limited), Cow::Borrowed(_)),
+            "{src:?}"
+        );
     }
 }
