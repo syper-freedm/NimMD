@@ -1,0 +1,12 @@
+{
+  "permissions": [
+    // ruleid: nimmd-tauri-plugin-capability
+    "fs:allow-read-file",
+    // ruleid: nimmd-tauri-plugin-capability
+    "shell:allow-open",
+    // ruleid: nimmd-tauri-plugin-capability
+    "http:default",
+    // ok: nimmd-tauri-plugin-capability
+    "core:default"
+  ]
+}

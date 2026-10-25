@@ -1,0 +1,16 @@
+{
+  "app": {
+    "security": {
+      // ruleid: nimmd-tauri-csp-off
+      "csp": null,
+      // ruleid: nimmd-tauri-csp-off
+      "devCsp": null,
+      // ruleid: nimmd-tauri-csp-off
+      "dangerousDisableAssetCspModification": true,
+      // ruleid: nimmd-tauri-csp-off
+      "x": "script-src 'self' 'unsafe-eval'",
+      // ok: nimmd-tauri-csp-off
+      "csp": "default-src 'self'"
+    }
+  }
+}

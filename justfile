@@ -18,9 +18,11 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 
-# Инварианты проекта из .semgrep.yml (сеть не нужна)
+# Инварианты проекта из .semgrep.yml (сеть не нужна) и тесты самих правил в tests/semgrep
+# (semgrep --test не принимает каталог при одном файле правил, поэтому по файлу; обычный scan пропускает tests/)
 semgrep:
     semgrep scan --config .semgrep.yml --metrics=off --disable-version-check --error --quiet
+    for f in tests/semgrep/*; do semgrep --test --config .semgrep.yml --metrics=off --disable-version-check "$f" || exit 1; done
 
 # Уязвимости RustSec, лицензии, источники crates (deny.toml); база RustSec скачивается при запуске
 deny:
@@ -42,10 +44,7 @@ unused-deps:
 secrets:
     gitleaks git --redact --no-banner
 
-# GitHub Actions: проверяется, когда появится .github/workflows
+# GitHub Actions
 workflows:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    [ -d .github/workflows ] || exit 0
     actionlint
     zizmor --offline .github/workflows

@@ -7,7 +7,7 @@ rules:
     languages: [regex]
     paths:
       include: ["/crates/nimmd-core/src/**"]
-    pattern-regex: '\bstd::(fs|net|process)\b'
+    pattern-regex: '\bstd::(\{[^;]*)?\b(fs|net|process)\b'
 
   - id: nimmd-comrak-raw-html
     message: "Сырой HTML из Markdown в превью запрещён: comrak только с render.unsafe_ = false, иначе XSS в WebView"
@@ -35,10 +35,12 @@ rules:
   - id: nimmd-mermaid-strict
     message: "mermaid.initialize без securityLevel: 'strict' — диаграмма из чужого файла может выполнить скрипт"
     severity: ERROR
-    languages: [regex]
+    languages: [typescript, javascript]
     paths:
       exclude: ["/packages/vendor/**", "node_modules/", "*.min.js"]
-    pattern-regex: 'mermaid\.initialize\(\{\{?(?![^}]*securityLevel\s*:\s*[''"]strict[''"])'
+    patterns:
+      - pattern: mermaid.initialize($CFG)
+      - pattern-not: 'mermaid.initialize({..., securityLevel: "strict", ...})'
 
   - id: nimmd-katex-trust
     message: "KaTeX только с trust: false: \\href и \\htmlData из чужого файла иначе дают javascript:-ссылки"
@@ -46,7 +48,7 @@ rules:
     languages: [regex]
     paths:
       exclude: ["/packages/vendor/**", "node_modules/", "*.min.js"]
-    pattern-regex: '\btrust\s*:\s*true\b'
+    pattern-regex: '\btrust\s*:(?!\s*false\b)'
 
   - id: nimmd-tauri-csp-off
     message: "CSP WebView не отключается и не ослабляется: документ в WebView недоверенный"
