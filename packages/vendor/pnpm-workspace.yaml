@@ -1,0 +1,6 @@
+# elkjs (EPL-2.0) не устанавливается: лицензия вне белого списка (спек 12), импорт закрыт elk-stub.js
+overrides:
+  elkjs: "-"
+# Скрипты установки не выполняются (.npmrc ignore-scripts); esbuild берёт бинарник из платформенного optional-пакета
+allowBuilds:
+  esbuild: false

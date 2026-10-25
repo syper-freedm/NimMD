@@ -10,7 +10,7 @@ snap:
     cargo insta test --accept -p nimmd-core
 
 # Все проверки кода: стиль, линтеры, инварианты проекта, зависимости, секреты, CI
-lint: fmt-check clippy semgrep deny npm-licenses unused-deps secrets workflows
+lint: fmt-check clippy semgrep deny vendor npm-licenses unused-deps secrets workflows
 
 fmt-check:
     cargo fmt --all -- --check
@@ -25,6 +25,10 @@ semgrep:
 # Уязвимости RustSec, лицензии, источники crates (deny.toml); база RustSec скачивается при запуске
 deny:
     cargo deny check
+
+# KaTeX и Mermaid без elkjs в packages/vendor/dist; npm-реестр нужен для установки
+vendor:
+    bash packages/vendor/fetch.sh
 
 # Лицензии npm-зависимостей по тому же белому списку deny.toml; KaTeX и Mermaid в packages/vendor — devDependencies
 npm-licenses:

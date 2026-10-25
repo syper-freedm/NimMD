@@ -36,10 +36,11 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: just,cargo-deny,cargo-machete,zizmor
-      - name: Установить semgrep, gitleaks, actionlint
-        run: |
+      - name: Установить semgrep, gitleaks, actionlint, pnpm
+        run: | # zizmor: ignore[adhoc-packages] pnpm закреплён точной версией
           pipx install semgrep==1.182.0
           go install github.com/zricethezav/gitleaks/v8@v8.30.1
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          npm install -g pnpm@12.15.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - run: just lint
