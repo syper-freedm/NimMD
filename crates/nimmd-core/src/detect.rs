@@ -16,10 +16,20 @@ use crate::text::{frontmatter_dialect, limit_nesting, split_frontmatter};
 /// Ключ `markdown:` во frontmatter заменяет вычисленный диалект и не меняет расширения.
 pub fn detect(src: &str) -> Profile {
     let (frontmatter, body) = split_frontmatter(src);
-    let signs = Signs::scan(body);
     let arena = Arena::new();
     let limited = limit_nesting(body);
     let (math, mermaid) = ast_features(parse_document(&arena, &limited, parse::options()));
+    profile_of(frontmatter, body, math, mermaid)
+}
+
+/// Профиль по frontmatter, текстовым признакам тела и флагам `(math, mermaid)` из дерева comrak.
+pub(crate) fn profile_of(
+    frontmatter: Option<&str>,
+    body: &str,
+    math: bool,
+    mermaid: bool,
+) -> Profile {
+    let signs = Signs::scan(body);
     let features = Features {
         frontmatter: frontmatter.is_some(),
         math,

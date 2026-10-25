@@ -5,13 +5,16 @@
 
 use std::borrow::Cow;
 
+use serde::Serialize;
+
 use crate::profile::Dialect;
 
 /// Предел размера документа в байтах.
 pub const MAX_BYTES: usize = 10 * 1024 * 1024;
 
 /// Стиль переноса строк.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LineEnding {
     Lf,
     CrLf,

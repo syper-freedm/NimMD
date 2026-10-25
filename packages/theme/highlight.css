@@ -1,0 +1,40 @@
+/* Цвета классов syntect (ClassStyle::Spaced) для блоков кода и frontmatter */
+:root {
+  --hl-comment: #59636e;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-constant: #0550ae;
+  --hl-entity: #6639ba;
+  --hl-tag: #116329;
+  --hl-variable: #953800;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --hl-comment: #9198a1;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-constant: #79c0ff;
+    --hl-entity: #d2a8ff;
+    --hl-tag: #7ee787;
+    --hl-variable: #ffa657;
+  }
+}
+
+[data-theme="dark"] {
+  --hl-comment: #9198a1;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-constant: #79c0ff;
+  --hl-entity: #d2a8ff;
+  --hl-tag: #7ee787;
+  --hl-variable: #ffa657;
+}
+
+.comment { color: var(--hl-comment); font-style: italic; }
+.keyword, .storage { color: var(--hl-keyword); }
+.string { color: var(--hl-string); }
+.constant, .support { color: var(--hl-constant); }
+.entity { color: var(--hl-entity); }
+.entity.tag { color: var(--hl-tag); }
+.variable { color: var(--hl-variable); }
