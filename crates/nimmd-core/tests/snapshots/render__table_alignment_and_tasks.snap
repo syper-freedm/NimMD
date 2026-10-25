@@ -1,0 +1,22 @@
+---
+source: crates/nimmd-core/tests/render.rs
+expression: html
+---
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th align="center">b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td align="center">2</td>
+</tr>
+</tbody>
+</table>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="" disabled="" /> done</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="" /> todo</li>
+</ul>

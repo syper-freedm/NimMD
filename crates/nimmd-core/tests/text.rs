@@ -332,7 +332,24 @@ fn limit_nesting_is_lossless_and_idempotent() {
             })
             .collect();
         let limited = limit_nesting(&src);
-        assert_eq!(limited.replace('\\', ""), src, "{src:?}");
+        // Без вставленных `\\` строка — исходная, у которой сокращён лишь ведущий отступ
+        let unescaped = limited.replace('\\', "");
+        assert_eq!(unescaped.lines().count(), src.lines().count(), "{src:?}");
+        for (got, orig) in unescaped.lines().zip(src.lines()) {
+            let body = got.trim_start_matches([' ', '\t']);
+            let (indent, orig_indent) = (
+                &got[..got.len() - body.len()],
+                &orig[..orig.len() - body.len()],
+            );
+            assert!(
+                orig.ends_with(body) && orig_indent.starts_with(indent),
+                "{src:?}"
+            );
+            assert!(
+                orig_indent.trim_start_matches([' ', '\t']).is_empty(),
+                "{src:?}"
+            );
+        }
         assert_eq!(
             matches!(limited, Cow::Borrowed(_)),
             limited == src,

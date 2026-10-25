@@ -107,14 +107,24 @@ pub fn truncate_at_char_boundary(src: &str, max: usize) -> (&str, bool) {
 /// Предел вложенности контейнеров (`>` и маркеров списка) в префиксе строки (спек 5.2).
 pub const MAX_NESTING: usize = 64;
 
-/// Вставляет `\` перед маркером контейнера сверх [`MAX_NESTING`] в префиксе каждой строки.
+/// Предел ширины ведущего отступа строки в колонках; табуляция — до следующей кратной 4 колонки.
+const MAX_INDENT: usize = 4 * MAX_NESTING;
+
+/// Ограничивает глубину вложенности контейнеров в префиксе каждой строки.
 ///
-/// Без разбора comrak квадратичен по глубине вложенности. Остаток строки становится текстом,
-/// символы исходника не теряются; без таких строк возвращает исходную строку без копирования.
+/// Без разбора comrak квадратичен по глубине вложенности. Перед маркером контейнера сверх
+/// [`MAX_NESTING`] вставляется `\` (у `N.`/`N)` — перед `.`/`)`), остаток строки становится текстом;
+/// ведущие пробелы и табуляции шире [`MAX_INDENT`] колонок сокращаются до этой ширины.
+/// Кроме сокращённого отступа символы исходника не теряются: удаление вставленных `\` и
+/// восстановление отступа дают исходник. Без таких строк возвращает исходную строку без копирования.
 pub fn limit_nesting(src: &str) -> Cow<'_, str> {
     let mut out = String::new();
     let (mut copied, mut line_start) = (0, 0);
     for line in src.split_inclusive('\n') {
+        if let Some((keep, indent_end)) = indent_overflow(line) {
+            out.push_str(src.get(copied..line_start + keep).unwrap_or(""));
+            copied = line_start + indent_end;
+        }
         if let Some(at) = overflow_marker(line) {
             out.push_str(src.get(copied..line_start + at).unwrap_or(""));
             out.push('\\');
@@ -129,14 +139,33 @@ pub fn limit_nesting(src: &str) -> Cow<'_, str> {
     Cow::Owned(out)
 }
 
-/// Байтовое смещение маркера с номером `MAX_NESTING + 1` в префиксе строки.
+/// `(конец части отступа шириной MAX_INDENT, конец отступа)` в байтах, если отступ шире `MAX_INDENT`.
+fn indent_overflow(line: &str) -> Option<(usize, usize)> {
+    let (mut col, mut keep) = (0, None);
+    for (i, b) in line.bytes().enumerate() {
+        col = match b {
+            b' ' => col + 1,
+            b'\t' => col / 4 * 4 + 4,
+            _ => return keep.zip((col > MAX_INDENT).then_some(i)),
+        };
+        // Табуляция не перескакивает кратную 4 границу, поэтому ширина MAX_INDENT достигается точно
+        if col == MAX_INDENT {
+            keep = Some(i + 1);
+        }
+    }
+    keep.zip((col > MAX_INDENT).then_some(line.len()))
+}
+
+/// Байтовое смещение для `\` у маркера с номером `MAX_NESTING + 1` в префиксе строки:
+/// начало маркера, а у `N.`/`N)` — позиция `.`/`)`, чтобы `\` экранировал пунктуацию и не был виден.
 fn overflow_marker(line: &str) -> Option<usize> {
     let mut rest = line;
     for _ in 0..MAX_NESTING {
         rest = container_marker(rest.trim_start_matches([' ', '\t']))?;
     }
     let tail = rest.trim_start_matches([' ', '\t']);
-    container_marker(tail).map(|_| line.len() - tail.len())
+    container_marker(tail)?;
+    Some(line.len() - tail.trim_start_matches(|c: char| c.is_ascii_digit()).len())
 }
 
 /// Остаток после маркера контейнера в начале `s`: `>` или `-`, `*`, `+`, `N.`, `N)` с пробелом либо концом строки.

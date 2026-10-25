@@ -1,0 +1,6 @@
+---
+source: crates/nimmd-core/tests/render.rs
+expression: html
+---
+<pre class="syntax-highlighting"><code><span class="source rust"><span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">main</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span></span><span class="meta block rust"><span class="punctuation section block end rust">}</span></span></span>
+</span></code></pre>

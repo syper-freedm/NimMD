@@ -18,8 +18,8 @@ pub fn detect(src: &str) -> Profile {
     let (frontmatter, body) = split_frontmatter(src);
     let signs = Signs::scan(body);
     let arena = Arena::new();
-    let limited = limit_nesting(src);
-    let (math, mermaid) = ast_features(parse_document(&arena, &limited, &parse::options()));
+    let limited = limit_nesting(body);
+    let (math, mermaid) = ast_features(parse_document(&arena, &limited, parse::options()));
     let features = Features {
         frontmatter: frontmatter.is_some(),
         math,
