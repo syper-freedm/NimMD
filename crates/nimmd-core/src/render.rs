@@ -1,15 +1,19 @@
 //! Рендер тела документа в HTML-фрагмент.
 
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::OnceLock;
 
 use comrak::adapters::{CodefenceRendererAdapter, SyntaxHighlighterAdapter};
 use comrak::nodes::{AstNode, NodeMath, NodeValue, Sourcepos};
 use comrak::options::Plugins;
-use comrak::plugins::syntect::SyntectAdapter;
 use comrak::{Arena, format_html_with_plugins, html, parse_document};
 use latex2mathml::token::Token;
 use latex2mathml::{DisplayStyle, latex_to_mathml};
+use syntect::html::{ClassStyle, ClassedHTMLGenerator};
+use syntect::parsing::SyntaxSet;
+use syntect::util::LinesWithEndings;
 
 use crate::detect::ast_features;
 use crate::document::MathMode;
@@ -85,7 +89,7 @@ pub(crate) fn render_body(body: &str, math: MathMode, remote_images: bool) -> Bo
 /// YAML frontmatter, подсвеченный CSS-классами syntect, как блок кода `yaml`.
 pub(crate) fn highlight_yaml(out: &mut String, yaml: &str) {
     // Запись в String не падает
-    let _ = syntect().write_highlighted(out, Some("yaml"), yaml);
+    let _ = Highlighter.write_highlighted(out, Some("yaml"), yaml);
 }
 
 pub(crate) fn push_escaped(out: &mut String, text: &str) {
@@ -252,17 +256,82 @@ fn normalize_mermaid(info: &mut String) {
     }
 }
 
-fn syntect() -> &'static SyntectAdapter {
-    static SYNTECT: OnceLock<SyntectAdapter> = OnceLock::new();
-    // Без темы адаптер выводит CSS-классы, а не `style=`
-    SYNTECT.get_or_init(|| SyntectAdapter::new(None))
+fn syntaxes() -> &'static SyntaxSet {
+    static SYNTAXES: OnceLock<SyntaxSet> = OnceLock::new();
+    SYNTAXES.get_or_init(SyntaxSet::load_defaults_newlines)
+}
+
+/// Подсветка кода CSS-классами syntect; выбор грамматики — как у адаптера syntect в comrak 0.56.
+struct Highlighter;
+
+impl Highlighter {
+    fn highlight(lang: Option<&str>, code: &str) -> Result<String, syntect::Error> {
+        let syntaxes = syntaxes();
+        // Без языка — Plain Text, грамматика по первой строке не ищется
+        let syntax = lang
+            .filter(|l| !l.is_empty())
+            .map(|l| l.split_once(',').map_or(l, |(left, _)| left))
+            .and_then(|token| {
+                syntaxes
+                    .find_syntax_by_token(token)
+                    .or_else(|| syntaxes.find_syntax_by_first_line(code))
+            })
+            .unwrap_or_else(|| syntaxes.find_syntax_plain_text());
+        let mut html =
+            ClassedHTMLGenerator::new_with_class_style(syntax, syntaxes, ClassStyle::Spaced);
+        for line in LinesWithEndings::from(code) {
+            html.parse_html_for_line_which_includes_newline(line)?;
+        }
+        Ok(html.finalize())
+    }
+}
+
+/// Подсвеченный HTML блока или, при ошибке syntect, весь его текст экранированным:
+/// частичный вывод отбрасывается, сырой код в HTML не попадает.
+fn write_highlight_or_escaped(
+    output: &mut dyn fmt::Write,
+    highlighted: Result<String, syntect::Error>,
+    code: &str,
+) -> fmt::Result {
+    match highlighted {
+        Ok(html) => output.write_str(&html),
+        Err(_) => html::escape(output, code),
+    }
+}
+
+impl SyntaxHighlighterAdapter for Highlighter {
+    fn write_highlighted(
+        &self,
+        output: &mut dyn fmt::Write,
+        lang: Option<&str>,
+        code: &str,
+    ) -> fmt::Result {
+        write_highlight_or_escaped(output, Self::highlight(lang, code), code)
+    }
+
+    fn write_pre_tag(
+        &self,
+        output: &mut dyn fmt::Write,
+        _attributes: HashMap<&'static str, Cow<'_, str>>,
+    ) -> fmt::Result {
+        html::write_opening_tag(output, "pre", [("class", "syntax-highlighting")])
+    }
+
+    fn write_code_tag(
+        &self,
+        output: &mut dyn fmt::Write,
+        attributes: HashMap<&'static str, Cow<'_, str>>,
+    ) -> fmt::Result {
+        // Значения атрибутов (класс языка из документа) экранирует comrak
+        html::write_opening_tag(output, "code", attributes)
+    }
 }
 
 fn plugins() -> &'static Plugins<'static> {
     static PLUGINS: OnceLock<Plugins<'static>> = OnceLock::new();
     PLUGINS.get_or_init(|| {
         let mut plugins = Plugins::default();
-        plugins.render.codefence_syntax_highlighter = Some(syntect());
+        plugins.render.codefence_syntax_highlighter = Some(&Highlighter);
         plugins
             .render
             .codefence_renderers
@@ -286,5 +355,34 @@ impl CodefenceRendererAdapter for Mermaid {
         output.write_str("<pre class=\"mermaid\">")?;
         html::escape(output, code)?;
         output.write_str("</pre>\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_highlight_or_escaped;
+
+    fn written(highlighted: Result<String, syntect::Error>, code: &str) -> String {
+        let mut out = String::new();
+        write_highlight_or_escaped(&mut out, highlighted, code).unwrap();
+        out
+    }
+
+    #[test]
+    fn highlight_error_writes_escaped_code() {
+        let code = "<script>alert(1)</script> & \"x\"";
+        let out = written(Err(syntect::Error::Fmt(std::fmt::Error)), code);
+        assert_eq!(
+            out,
+            "&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;x&quot;"
+        );
+        assert!(!out.contains("<script") && !out.contains("<span"), "{out}");
+        assert_eq!(written(Err(syntect::Error::Fmt(std::fmt::Error)), ""), "");
+    }
+
+    #[test]
+    fn highlight_ok_written_unchanged() {
+        let html = "<span class=\"source\">x</span>";
+        assert_eq!(written(Ok(html.to_owned()), "<b>other</b>"), html);
     }
 }

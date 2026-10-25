@@ -52,6 +52,54 @@ fn code_without_or_with_unknown_language() {
 }
 
 #[test]
+fn unknown_language_code_is_escaped() {
+    let html = render_fragment("```nosuchlang\n<script>x</script>\n```\n");
+    assert!(
+        html.starts_with("<pre class=\"syntax-highlighting\"><code>"),
+        "{html}"
+    );
+    assert!(html.contains("&lt;script&gt;"), "{html}");
+    assert!(!html.contains("<script"), "{html}");
+    assert!(!html.contains("nosuchlang"), "{html}");
+}
+
+#[test]
+fn plain_code_is_escaped() {
+    let html = render_fragment("```\n<img src=x onerror=y>\n```\n");
+    assert!(
+        html.starts_with("<pre class=\"syntax-highlighting\"><code>"),
+        "{html}"
+    );
+    assert!(html.contains("&lt;img"), "{html}");
+    assert!(!html.contains("<img"), "{html}");
+}
+
+#[test]
+fn language_with_quote_does_not_reach_attributes() {
+    let html = render_fragment("```x\"onmouseover=y\nz\n```\n");
+    assert!(
+        html.starts_with("<pre class=\"syntax-highlighting\"><code>"),
+        "{html}"
+    );
+    assert!(!html.contains("onmouseover"), "{html}");
+}
+
+#[test]
+fn grammar_choice_by_token_first_line_or_plain() {
+    // Слово до запятой — токен грамматики
+    let rust = render_fragment("```rust,ignore\nfn main() {}\n```\n");
+    assert!(rust.contains("class=\"source rust\""), "{rust}");
+    // Неизвестный токен — грамматика по первой строке
+    let shebang = "#!/bin/bash\necho\n";
+    let unknown = render_fragment(&format!("```nosuchlang\n{shebang}```\n"));
+    assert!(unknown.contains("class=\"source shell bash\""), "{unknown}");
+    // Без языка первая строка не смотрится
+    let plain = render_fragment(&format!("```\n{shebang}```\n"));
+    assert!(plain.contains("class=\"text plain\""), "{plain}");
+    assert!(!plain.contains("shell"), "{plain}");
+}
+
+#[test]
 fn five_alert_types_ignore_case() {
     for (marker, kind) in [
         ("NOTE", "note"),

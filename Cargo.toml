@@ -8,7 +8,9 @@ license = "MIT"
 rust-version = "1.85"
 
 [workspace.dependencies]
-comrak = { version = "0.56", default-features = false, features = ["syntect-fancy"] }
+comrak = { version = "0.56", default-features = false }
+# Подсветка кода своим адаптером (render::Highlighter); движок регулярных выражений на чистом Rust
+syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "html", "regex-fancy"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 latex2mathml = "0.2"   # MathMode::MathML (спек 5.3, В2); MIT

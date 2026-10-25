@@ -15,6 +15,7 @@ workspace = true
 comrak = { workspace = true }
 latex2mathml = { workspace = true }
 serde = { workspace = true }
+syntect = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
