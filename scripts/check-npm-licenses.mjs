@@ -24,21 +24,50 @@ export function isAllowed(expr, allowed) {
   return or.length > 1 ? or.some((l) => allowed.has(l)) : and.every((l) => allowed.has(l));
 }
 
+// Ручные уточнения лицензии, которую pnpm не распознал, по каталогу первого аргумента.
+// Ключ — точная версия: новая версия пакета снова проходит проверку.
+const OVERRIDES = {
+  "packages/vendor": {
+    // Файл license в репозитории fabiospampinato/khroma — «The MIT License (MIT)», проверено 2026-10-26.
+    "khroma@2.1.0": "MIT",
+  },
+};
+
+// Сверка вывода `pnpm licenses list --json` с белым списком и уточнениями каталога.
+// Нарушения — без префикса каталога, его добавляет вызывающий.
+export function reconcile(byLicense, allowed, overrides) {
+  const used = new Set();
+  const violations = Object.entries(byLicense).flatMap(([license, pkgs]) =>
+    pkgs.flatMap((p) =>
+      p.versions.flatMap((v) => {
+        const key = `${p.name}@${v}`;
+        const fixed = overrides[key];
+        if (fixed !== undefined) used.add(key);
+        if (isAllowed(license, allowed)) return [];
+        if (fixed === undefined) return [`${key} — ${license}`];
+        return isAllowed(fixed, allowed) ? [] : [`${key} — ${license} (уточнено: ${fixed})`];
+      }),
+    ),
+  );
+  return { violations, unused: Object.keys(overrides).filter((k) => !used.has(k)) };
+}
+
 function check(dir, prod, allowed) {
   if (!existsSync(join(dir, "package.json"))) return [];
   const args = ["licenses", "list", "--json", ...(prod ? ["--prod"] : [])];
   const byLicense = JSON.parse(execFileSync("pnpm", args, { cwd: dir, encoding: "utf8", shell: process.platform === "win32" }) || "{}");
-  return Object.entries(byLicense)
-    .filter(([license]) => !isAllowed(license, allowed))
-    .flatMap(([license, pkgs]) => pkgs.map((p) => `${dir}: ${p.name}@${p.versions.join(",")} — ${license}`));
+  const { violations, unused } = reconcile(byLicense, allowed, OVERRIDES[dir] ?? {});
+  const errors = violations.length ? [`Лицензии вне белого списка deny.toml:\n${violations.map((v) => `${dir}: ${v}`).join("\n")}`] : [];
+  if (unused.length) errors.push(`Уточнения без совпадения в ${dir} (обновите или удалите): ${unused.join(", ")}`);
+  return errors;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [dir, ...flags] = process.argv.slice(2);
   const root = join(fileURLToPath(import.meta.url), "../..");
-  const bad = check(dir, flags.includes("--prod"), allowedLicenses(readFileSync(join(root, "deny.toml"), "utf8")));
-  if (bad.length) {
-    console.error(`Лицензии вне белого списка deny.toml:\n${bad.join("\n")}`);
+  const errors = check(dir, flags.includes("--prod"), allowedLicenses(readFileSync(join(root, "deny.toml"), "utf8")));
+  if (errors.length) {
+    console.error(errors.join("\n"));
     process.exit(1);
   }
 }
