@@ -219,7 +219,7 @@ fn profile_matches_detect_on_fixtures() {
             let expected = detect(&normalize_newlines(strip_bom(&src).1));
             assert_eq!(render(&src, &opts()).profile, expected, "{name}");
             // Тот же текст с BOM и CRLF
-            let crlf = format!("\u{FEFF}{}", src.replace('\n', "\r\n"));
+            let crlf = format!("\u{FEFF}{}", normalize_newlines(&src).replace('\n', "\r\n"));
             assert_eq!(render(&crlf, &opts()).profile, expected, "{name} (crlf)");
             checked += 1;
         }
