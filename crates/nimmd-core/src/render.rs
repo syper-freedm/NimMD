@@ -1,7 +1,6 @@
 //! Рендер тела документа в HTML-фрагмент.
 
 use std::fmt;
-use std::sync::OnceLock;
 
 use comrak::adapters::CodefenceRendererAdapter;
 use comrak::nodes::{AstNode, NodeMath, NodeValue, Sourcepos};
@@ -12,7 +11,7 @@ use latex2mathml::{DisplayStyle, latex_to_mathml};
 use serde::{Deserialize, Serialize};
 
 use crate::detect::ast_features;
-use crate::highlight::{Highlighter, write_highlighted};
+use crate::highlight::Highlighter;
 use crate::parse;
 use crate::text::{MAX_NESTING, limit_nesting};
 
@@ -38,7 +37,7 @@ pub enum MathMode {
 /// опасные адреса ссылок и картинок отбрасывает comrak, код подсвечивается CSS-классами,
 /// блоки `mermaid` выводятся как `<pre class="mermaid">` для хоста.
 pub fn render_fragment(body: &str) -> String {
-    render_body(body, MathMode::Katex, true).html
+    render_body(body, MathMode::Katex, true, &Highlighter::default()).html
 }
 
 /// Результат одного разбора тела: фрагмент, флаги профиля и заголовок.
@@ -47,10 +46,18 @@ pub(crate) struct Body {
     pub math: bool,
     pub mermaid: bool,
     pub title: Option<String>,
+    /// Часть кода выведена без подсветки по лимиту `highlighter` (с учётом frontmatter до тела).
+    pub highlight_limited: bool,
 }
 
 /// Разбирает тело один раз: из того же дерева берутся флаги `math`/`mermaid` и заголовок.
-pub(crate) fn render_body(body: &str, math: MathMode, remote_images: bool) -> Body {
+/// `highlighter` — счётчик лимита подсветки этого документа.
+pub(crate) fn render_body(
+    body: &str,
+    math: MathMode,
+    remote_images: bool,
+    highlighter: &Highlighter,
+) -> Body {
     let limited = limit_nesting(body);
     let arena = Arena::new();
     let root = parse_document(&arena, &limited, parse::options());
@@ -84,21 +91,28 @@ pub(crate) fn render_body(body: &str, math: MathMode, remote_images: bool) -> Bo
             }
         }
     }
+    let mut plugins = Plugins::default();
+    plugins.render.codefence_syntax_highlighter = Some(highlighter);
+    plugins
+        .render
+        .codefence_renderers
+        .insert("mermaid".to_owned(), &Mermaid);
     let mut out = String::new();
     // Запись в String не падает, а адаптеры ошибок не возвращают: при ошибке остаётся уже выведенный HTML
-    let _ = format_html_with_plugins(root, parse::options(), &mut out, plugins());
+    let _ = format_html_with_plugins(root, parse::options(), &mut out, &plugins);
     Body {
         html: out,
         math: has_math,
         mermaid,
         title: title.filter(|text: &String| !text.is_empty()),
+        highlight_limited: highlighter.limited(),
     }
 }
 
-/// YAML frontmatter, подсвеченный CSS-классами syntect, как блок кода `yaml`.
-pub(crate) fn highlight_yaml(out: &mut String, yaml: &str) {
+/// YAML frontmatter, подсвеченный CSS-классами syntect как блок кода `yaml`, под лимитом `highlighter`.
+pub(crate) fn highlight_yaml(out: &mut String, yaml: &str, highlighter: &Highlighter) {
     // Запись в String не падает
-    let _ = write_highlighted(out, "yaml", yaml);
+    let _ = highlighter.write(out, "yaml", yaml);
 }
 
 pub(crate) fn push_escaped(out: &mut String, text: &str) {
@@ -264,19 +278,6 @@ fn normalize_mermaid(info: &mut String) {
     {
         info.replace_range(..end, "mermaid");
     }
-}
-
-fn plugins() -> &'static Plugins<'static> {
-    static PLUGINS: OnceLock<Plugins<'static>> = OnceLock::new();
-    PLUGINS.get_or_init(|| {
-        let mut plugins = Plugins::default();
-        plugins.render.codefence_syntax_highlighter = Some(&Highlighter);
-        plugins
-            .render
-            .codefence_renderers
-            .insert("mermaid".to_owned(), &Mermaid);
-        plugins
-    })
 }
 
 /// Блок диаграммы: экранированный текст без подсветки, рисует его Mermaid на стороне хоста.

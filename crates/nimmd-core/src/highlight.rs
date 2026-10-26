@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::html;
@@ -15,8 +16,14 @@ use syntect::util::LinesWithEndings;
 
 use crate::text::truncate_at_char_boundary;
 
-/// Предел подсветки файла данных и спанов [`highlight`] в байтах; дальше — текст без подсветки.
-pub const HIGHLIGHT_LIMIT: usize = 2 * 1024 * 1024;
+/// Предел подсветки файла TOML/YAML/JSON и спанов [`highlight`] в байтах; дальше — текст без подсветки.
+pub const HIGHLIGHT_LIMIT: usize = 64 * 1024;
+
+/// Предел раскраски CSV в байтах; дальше — текст без раскраски.
+pub const CSV_COLOR_LIMIT: usize = 2 * 1024 * 1024;
+
+/// Суммарный объём подсвечиваемого кода (frontmatter и блоки) одного документа Markdown в байтах.
+pub const MARKDOWN_HIGHLIGHT_LIMIT: usize = 8 * 1024;
 
 /// Участок кода с неизменным стеком scope; смещения — в UTF-16 от начала кода.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -32,7 +39,7 @@ pub struct Span {
 /// Тотальна: при ошибке syntect или без грамматики — пустой `Vec`. Подсвечивается голова
 /// не длиннее [`HIGHLIGHT_LIMIT`] (по правилу [`split_head`]), дальше спанов нет.
 pub fn highlight(lang: &str, code: &str) -> Vec<Span> {
-    spans(lang, split_head(code).0).unwrap_or_default()
+    spans(lang, split_head(code, HIGHLIGHT_LIMIT).0).unwrap_or_default()
 }
 
 fn spans(lang: &str, code: &str) -> Option<Vec<Span>> {
@@ -82,10 +89,10 @@ fn class_of(stack: &ScopeStack) -> String {
     atoms.join(" ")
 }
 
-/// Голова и хвост кода: голова — до последнего `\n` (включительно) в первых [`HIGHLIGHT_LIMIT`]
-/// байтах, без `\n` — до границы символа не дальше предела. Короткий код — целиком голова.
-pub(crate) fn split_head(code: &str) -> (&str, &str) {
-    let (head, cut) = truncate_at_char_boundary(code, HIGHLIGHT_LIMIT);
+/// Голова и хвост кода: голова — до последнего `\n` (включительно) в первых `limit` байтах,
+/// без `\n` — до границы символа не дальше предела. Короткий код — целиком голова.
+pub(crate) fn split_head(code: &str, limit: usize) -> (&str, &str) {
+    let (head, cut) = truncate_at_char_boundary(code, limit);
     if !cut {
         return (code, "");
     }
@@ -148,8 +155,37 @@ fn write_html_or_escaped(
     }
 }
 
-/// Адаптер подсветки блоков кода comrak.
-pub(crate) struct Highlighter;
+/// Адаптер подсветки блоков кода comrak со счётчиком [`MARKDOWN_HIGHLIGHT_LIMIT`]: один на
+/// разбор документа. Атомики — потому что адаптер comrak обязан быть `Sync`.
+#[derive(Default)]
+pub(crate) struct Highlighter {
+    used: AtomicUsize,
+    limited: AtomicBool,
+}
+
+impl Highlighter {
+    /// Подсвеченный HTML кода, а сверх лимита документа — экранированный текст.
+    /// Код с грамматикой Plain Text лимит не тратит.
+    pub(crate) fn write(&self, output: &mut dyn fmt::Write, lang: &str, code: &str) -> fmt::Result {
+        let plain = find_syntax(syntaxes(), lang, code).is_none_or(|s| s.name == "Plain Text");
+        if plain {
+            return write_highlighted(output, lang, code);
+        }
+        let used = self.used.load(Ordering::Relaxed).saturating_add(code.len());
+        if used <= MARKDOWN_HIGHLIGHT_LIMIT {
+            self.used.store(used, Ordering::Relaxed);
+            write_highlighted(output, lang, code)
+        } else {
+            self.limited.store(true, Ordering::Relaxed);
+            html::escape(output, code)
+        }
+    }
+
+    /// Хоть один фрагмент выведен без подсветки по лимиту.
+    pub(crate) fn limited(&self) -> bool {
+        self.limited.load(Ordering::Relaxed)
+    }
+}
 
 impl SyntaxHighlighterAdapter for Highlighter {
     fn write_highlighted(
@@ -158,7 +194,7 @@ impl SyntaxHighlighterAdapter for Highlighter {
         lang: Option<&str>,
         code: &str,
     ) -> fmt::Result {
-        write_highlighted(output, lang.unwrap_or(""), code)
+        self.write(output, lang.unwrap_or(""), code)
     }
 
     fn write_pre_tag(

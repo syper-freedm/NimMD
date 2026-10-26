@@ -3,7 +3,10 @@ use std::path::Path;
 
 use nimmd_core::profile::{Dialect, Features, Profile};
 use nimmd_core::text::{LineEnding, MAX_NESTING, normalize_newlines, strip_bom};
-use nimmd_core::{AssetMode, MathMode, RenderOptions, Rendered, Theme, detect, render};
+use nimmd_core::{
+    AssetMode, MARKDOWN_HIGHLIGHT_LIMIT, MathMode, RenderOptions, Rendered, Theme, detect, render,
+    render_fragment,
+};
 
 const MIB: usize = 1024 * 1024;
 const NIMMD_CSS: &str = include_str!("../../../packages/theme/nimmd.css");
@@ -849,4 +852,336 @@ fn render_is_total_on_random_input() {
         assert!(!out.body.contains("<img src=\"https:"), "{src:?}");
         assert!(!out.body.contains("<img src=\"//"), "{src:?}");
     }
+}
+
+const CODE_LIMIT_BANNER: &str =
+    "<div class=\"banner\">Часть кода показана без подсветки: лимит 8 КБ на документ</div>";
+
+/// Код ровно `len` байт (`len ≥ 1`): строки `x…` по 64 байта, в конце `\n`.
+fn code_of(len: usize) -> String {
+    let mut code = "x".repeat(len - 1);
+    for at in (63..len - 1).step_by(64) {
+        code.replace_range(at..=at, "\n");
+    }
+    code.push('\n');
+    code
+}
+
+/// Огороженный блок `lang` с кодом ровно `len` байт.
+fn fence(lang: &str, len: usize) -> String {
+    format!("```{lang}\n{}```\n\n", code_of(len))
+}
+
+/// Блоки `<pre…>…</pre>` фрагмента по порядку.
+fn pres(body: &str) -> Vec<&str> {
+    body.match_indices("<pre")
+        .map(|(at, _)| {
+            let rest = &body[at..];
+            &rest[..rest
+                .find("</pre>")
+                .map_or(rest.len(), |end| end + "</pre>".len())]
+        })
+        .collect()
+}
+
+#[test]
+fn markdown_code_limit_skips_block_over_budget() {
+    let src = [
+        fence("rust", 5 * 1024),
+        fence("python", 5 * 1024),
+        fence("rust", 2 * 1024),
+        fence("", 20 * 1024),
+        "```mermaid\nA-->B\n```\n".to_owned(),
+    ]
+    .concat();
+    let out = render(&src, &opts());
+    let blocks = pres(&out.body);
+    assert_eq!(blocks.len(), 5, "{}", out.body);
+    assert!(
+        blocks[0].contains("<span class=\"source rust"),
+        "{}",
+        blocks[0]
+    );
+    assert!(
+        blocks[1].starts_with("<pre class=\"syntax-highlighting\"><code>"),
+        "{}",
+        blocks[1]
+    );
+    assert!(!blocks[1].contains("<span"), "{}", blocks[1]);
+    assert_eq!(
+        blocks[1],
+        format!(
+            "<pre class=\"syntax-highlighting\"><code>{}</code></pre>",
+            code_of(5 * 1024)
+        )
+    );
+    assert!(
+        blocks[2].contains("<span class=\"source rust"),
+        "{}",
+        blocks[2]
+    );
+    assert!(
+        blocks[3].contains("<span class=\"text plain"),
+        "{}",
+        blocks[3]
+    );
+    assert!(
+        blocks[4].starts_with("<pre class=\"mermaid\">"),
+        "{}",
+        blocks[4]
+    );
+    assert!(out.highlight_limited);
+    assert_eq!(
+        out.body.matches(CODE_LIMIT_BANNER).count(),
+        1,
+        "{}",
+        out.body
+    );
+    let banner = out.body.find(CODE_LIMIT_BANNER).unwrap();
+    assert!(banner > out.body.find(blocks[1]).unwrap() + blocks[1].len());
+    assert!(
+        out.body.ends_with(&format!("{CODE_LIMIT_BANNER}</main>")),
+        "{}",
+        &out.body[out.body.len() - 200..]
+    );
+}
+
+#[test]
+fn markdown_code_limit_inclusive_and_per_call() {
+    assert_eq!(
+        code_of(MARKDOWN_HIGHLIGHT_LIMIT).len(),
+        MARKDOWN_HIGHLIGHT_LIMIT
+    );
+    let exact = fence("rust", MARKDOWN_HIGHLIGHT_LIMIT);
+    let over = fence("rust", MARKDOWN_HIGHLIGHT_LIMIT + 1);
+
+    let first = render(&exact, &opts());
+    assert!(
+        first.body.contains("<span class=\"source rust"),
+        "{}",
+        first.body
+    );
+    assert!(!first.highlight_limited);
+    assert!(!first.body.contains("banner"), "{}", first.body);
+
+    let out = render(&over, &opts());
+    assert!(out.highlight_limited);
+    assert!(!out.body.contains("<span"), "{}", out.body);
+    assert!(out.body.contains(CODE_LIMIT_BANNER), "{}", out.body);
+
+    let again = render(&exact, &opts());
+    assert_eq!(again.html, first.html);
+    assert!(!again.highlight_limited);
+}
+
+#[test]
+fn frontmatter_spends_limit_first() {
+    let yaml = "key: value_1234567890\n".repeat(9 * 1024 / 22 + 1);
+    assert!(yaml.len() > 9 * 1024 - 22 && yaml.len() <= 9 * 1024 + 22);
+    let src = format!("---\n{yaml}---\n{}", fence("rust", 1024));
+    let out = render(&src, &opts());
+    let blocks = pres(&out.body);
+    assert_eq!(blocks.len(), 2, "{}", out.body);
+    assert!(
+        blocks[0].starts_with("<pre class=\"frontmatter\">"),
+        "{}",
+        blocks[0]
+    );
+    assert!(!blocks[0].contains("<span"), "{}", blocks[0]);
+    assert!(blocks[0].contains("key: value_1234567890"), "{}", blocks[0]);
+    assert!(
+        blocks[1].contains("<span class=\"source rust"),
+        "{}",
+        blocks[1]
+    );
+    assert!(out.highlight_limited);
+    assert!(
+        out.body
+            .ends_with(&format!("</pre>\n{CODE_LIMIT_BANNER}</main>")),
+        "{}",
+        &out.body[out.body.len() - 200..]
+    );
+
+    // Небольшой frontmatter подсвечен и тратит лимит: блок на остаток бюджета ещё подсвечен, на байт больше — нет
+    let small = "a: 1\n";
+    let fits = format!(
+        "---\n{small}---\n{}",
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT - small.len())
+    );
+    let out = render(&fits, &opts());
+    assert!(!out.highlight_limited, "{}", out.body);
+    assert_eq!(
+        pres(&out.body)
+            .iter()
+            .filter(|b| b.contains("<span"))
+            .count(),
+        2
+    );
+    let over = format!(
+        "---\n{small}---\n{}",
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT - small.len() + 1)
+    );
+    let out = render(&over, &opts());
+    assert!(out.highlight_limited);
+    let blocks = pres(&out.body);
+    assert!(blocks[0].contains("<span"), "{}", blocks[0]);
+    assert!(!blocks[1].contains("<span"), "{}", blocks[1]);
+}
+
+#[test]
+fn plain_and_unknown_code_do_not_spend_limit() {
+    let src = [
+        fence("", 20 * 1024),
+        fence("nosuchlang", 20 * 1024),
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT),
+    ]
+    .concat();
+    let out = render(&src, &opts());
+    assert!(!out.highlight_limited, "{}", out.body);
+    assert!(!out.body.contains("banner"));
+    let blocks = pres(&out.body);
+    assert!(
+        blocks[2].contains("<span class=\"source rust"),
+        "{}",
+        blocks[2]
+    );
+    // Mermaid идёт мимо подсветки и лимита
+    let src = format!(
+        "```mermaid\n{}```\n\n{}",
+        code_of(20 * 1024),
+        fence("rust", 1024)
+    );
+    let out = render(&src, &opts());
+    assert!(!out.highlight_limited);
+    assert!(pres(&out.body)[1].contains("<span class=\"source rust"));
+}
+
+#[test]
+fn code_over_limit_is_escaped() {
+    let src = format!(
+        "{}```html\n<script>alert(1)</script> & \"q\"\n```\n",
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT)
+    );
+    let out = render(&src, &opts());
+    assert!(out.highlight_limited);
+    assert!(!out.body.contains("<script"), "{}", out.body);
+    assert!(
+        out.body
+            .contains("&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot;"),
+        "{}",
+        out.body
+    );
+    let yaml = format!(
+        "a: \"<b>&</b>\"\n{}",
+        "k: v\n".repeat(MARKDOWN_HIGHLIGHT_LIMIT / 5)
+    );
+    let out = render(&format!("---\n{yaml}---\nx\n"), &opts());
+    assert!(out.highlight_limited);
+    assert!(!out.body.contains("<b>"), "{}", out.body);
+    assert!(
+        out.body.contains("&lt;b&gt;&amp;&lt;/b&gt;"),
+        "{}",
+        out.body
+    );
+}
+
+#[test]
+fn render_fragment_limits_without_banner() {
+    let src = [fence("rust", 5 * 1024), fence("rust", 5 * 1024)].concat();
+    let html = render_fragment(&src);
+    let blocks = pres(&html);
+    assert!(blocks[0].contains("<span"), "{}", blocks[0]);
+    assert!(!blocks[1].contains("<span"), "{}", blocks[1]);
+    assert!(!html.contains("banner"), "{html}");
+    // Счётчик — на вызов: тот же фрагмент даёт тот же HTML
+    assert_eq!(render_fragment(&src), html);
+    assert_eq!(
+        render(&src, &opts()).body,
+        format!("<main class=\"nimmd\">{html}{CODE_LIMIT_BANNER}</main>")
+    );
+}
+
+#[test]
+fn concurrent_renders_do_not_share_limit() {
+    let docs = [
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT),
+        fence("rust", MARKDOWN_HIGHLIGHT_LIMIT + 1),
+        [fence("python", 6 * 1024), fence("rust", 3 * 1024)].concat(),
+        fence("rust", 100),
+    ];
+    let expected: Vec<String> = docs.iter().map(|src| render(src, &opts()).html).collect();
+    std::thread::scope(|scope| {
+        for t in 0..4 {
+            let (docs, expected) = (&docs, &expected);
+            scope.spawn(move || {
+                for i in 0..8 {
+                    let k = (t + i) % docs.len();
+                    assert_eq!(
+                        render(&docs[k], &opts()).html,
+                        expected[k],
+                        "поток {t}, документ {k}"
+                    );
+                }
+            });
+        }
+    });
+}
+
+#[test]
+fn markdown_code_limit_matches_model_on_random_documents() {
+    const LANGS: [&str; 6] = ["rust", "python", "js", "", "nosuchlang", "mermaid"];
+    let mut rng = Rng(0x5EED_0045_C0DE_1111);
+    // Сколько документов вышло за лимит и сколько нет: обе ветки модели должны встретиться
+    let mut seen = [0; 2];
+    for _ in 0..30 {
+        let mut src = String::new();
+        // Модель FR-4: (подсвечен ли фрагмент) по порядку документа
+        let mut expected = Vec::new();
+        let mut used = 0;
+        let mut limited = false;
+        let mut spend = |n: usize, expected: &mut Vec<bool>| {
+            if used + n <= MARKDOWN_HIGHLIGHT_LIMIT {
+                used += n;
+                expected.push(true);
+            } else {
+                limited = true;
+                expected.push(false);
+            }
+        };
+        if rng.next() % 3 == 0 {
+            let yaml = "k: v\n".repeat(usize::try_from(rng.next() % 600).unwrap() + 1);
+            src = format!("---\n{yaml}---\n");
+            spend(yaml.len(), &mut expected);
+        }
+        for _ in 0..=rng.next() % 8 {
+            let lang = LANGS[usize::try_from(rng.next() % 6).unwrap()];
+            // Длинные блоки — у грамматик, тратящих лимит: остальные на модель не влияют
+            let max = if matches!(lang, "rust" | "python" | "js") {
+                6000
+            } else {
+                300
+            };
+            let len = usize::try_from(rng.next() % max).unwrap() + 2;
+            src.push_str(&fence(lang, len));
+            match lang {
+                "rust" | "python" | "js" => spend(len, &mut expected),
+                // Plain Text подсвечен всегда, mermaid мимо подсветки: счётчик не меняют
+                "" | "nosuchlang" => expected.push(true),
+                _ => expected.push(false),
+            }
+        }
+        let out = render(&src, &opts());
+        let actual: Vec<bool> = pres(&out.body)
+            .iter()
+            .map(|b| b.contains("<span"))
+            .collect();
+        assert_eq!(actual, expected, "{src:?}");
+        assert_eq!(out.highlight_limited, limited, "{src:?}");
+        assert_eq!(
+            out.body.matches(CODE_LIMIT_BANNER).count(),
+            usize::from(limited)
+        );
+        seen[usize::from(limited)] += 1;
+    }
+    assert!(seen[0] > 5 && seen[1] > 5, "{seen:?}");
 }

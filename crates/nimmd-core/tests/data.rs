@@ -3,12 +3,16 @@ use std::fs;
 use std::path::Path;
 
 use nimmd_core::profile::Profile;
-use nimmd_core::text::{LineEnding, normalize_newlines};
-use nimmd_core::{AssetMode, FileKind, HIGHLIGHT_LIMIT, RenderOptions, Rendered, render};
+use nimmd_core::text::{LineEnding, MAX_BYTES, normalize_newlines};
+use nimmd_core::{
+    AssetMode, CSV_COLOR_LIMIT, FileKind, HIGHLIGHT_LIMIT, MARKDOWN_HIGHLIGHT_LIMIT, RenderOptions,
+    Rendered, render,
+};
 
 const MIB: usize = 1024 * 1024;
 const DATA_CSS: &str = include_str!("../../../packages/theme/data.css");
-const LIMIT_BANNER: &str = "<div class=\"banner\">Подсветка отключена после 2 МБ</div>";
+const LIMIT_BANNER: &str = "<div class=\"banner\">Подсветка отключена после 64 КБ</div>";
+const CSV_BANNER: &str = "<div class=\"banner\">Подсветка отключена после 2 МБ</div>";
 
 fn of(kind: FileKind) -> RenderOptions {
     RenderOptions {
@@ -289,10 +293,10 @@ fn highlight_limit_splits_head_and_tail() {
     assert!(head_len > HIGHLIGHT_LIMIT - line.len(), "{head_len}");
 
     let csv_line = "a,b\n";
-    let csv = csv_line.repeat(HIGHLIGHT_LIMIT / csv_line.len() + 1000);
+    let csv = csv_line.repeat(CSV_COLOR_LIMIT / csv_line.len() + 1000);
     let out = data(&csv, FileKind::Csv);
     assert!(out.highlight_limited);
-    assert!(out.body.contains(LIMIT_BANNER));
+    assert!(out.body.contains(CSV_BANNER));
     assert!(out.body.contains("\na,b\n</pre>"));
     assert!(out.body.contains("<span class=\"c1\">b</span>"));
     assert_eq!(visible(pre(&out.body)), csv);
@@ -329,13 +333,15 @@ fn highlight_limit_exact_boundary() {
 
 #[test]
 fn long_line_without_newline_cut_at_char_boundary() {
-    // `"` + `ж`…: предел 2 МБ попадает в середину двухбайтового символа
+    // `"` + `ж`…: предел попадает в середину двухбайтового символа
     let src = format!("\"{}\"", "ж".repeat(HIGHLIGHT_LIMIT / 2 + 100));
     assert!(!src.is_char_boundary(HIGHLIGHT_LIMIT));
     let out = data(&src, FileKind::Json);
     assert!(out.highlight_limited);
     assert!(out.body.contains(LIMIT_BANNER));
     assert_eq!(visible(pre(&out.body)), src);
+    let src = format!("\"{}\"", "ж".repeat(CSV_COLOR_LIMIT / 2 + 100));
+    assert!(!src.is_char_boundary(CSV_COLOR_LIMIT));
     let csv = data(&src, FileKind::Csv);
     assert!(csv.highlight_limited);
     assert_eq!(visible(pre(&csv.body)), src);
@@ -372,11 +378,11 @@ fn not_utf8_bom_crlf_and_truncation() {
     };
     let out = render(&src, &opts);
     assert!(out.truncated);
-    assert!(!out.highlight_limited);
+    assert!(out.highlight_limited);
     assert!(
-        out.body.ends_with(
-            "</pre><div class=\"banner truncated\">Файл обрезан: показаны первые 1 МБ</div></main>"
-        ),
+        out.body.ends_with(&format!(
+            "</pre>{LIMIT_BANNER}<div class=\"banner truncated\">Файл обрезан: показаны первые 1 МБ</div></main>"
+        )),
         "{}",
         out.body.get(out.body.len() - 200..).unwrap_or_default()
     );
@@ -595,4 +601,78 @@ fn random_data_keeps_text() {
             assert_eq!(out.profile, Profile::default());
         }
     }
+}
+
+#[test]
+fn text_truncated_at_ten_mib_inside_char() {
+    assert_eq!(RenderOptions::default().max_bytes, MAX_BYTES);
+    let src = format!("a{}", "ё".repeat(MAX_BYTES / 2));
+    assert_eq!(src.len(), MAX_BYTES + 1);
+    assert!(!src.is_char_boundary(MAX_BYTES));
+    let out = data(&src, FileKind::Text);
+    assert!(out.truncated);
+    assert!(
+        out.body.ends_with(
+            "</pre><div class=\"banner truncated\">Файл обрезан: показаны первые 10 МБ</div></main>"
+        ),
+        "{}",
+        out.body.get(out.body.len() - 200..).unwrap_or_default()
+    );
+    // Без assert_eq: при провале не печатать 10 МБ
+    let shown = visible(pre(&out.body));
+    assert_eq!(shown.len(), MAX_BYTES - 1);
+    assert!(src.starts_with(&shown));
+
+    let exact = data(&"a".repeat(MAX_BYTES), FileKind::Text);
+    assert!(!exact.truncated);
+    assert!(!exact.body.contains("banner truncated"));
+    assert_eq!(pre(&exact.body).len(), MAX_BYTES);
+}
+
+#[test]
+fn data_limits_follow_kind() {
+    assert_eq!(HIGHLIGHT_LIMIT, 65_536);
+    assert_eq!(CSV_COLOR_LIMIT, 2_097_152);
+    assert_eq!(MARKDOWN_HIGHLIGHT_LIMIT, 8_192);
+    for (line, kind) in [
+        ("{\"k\": 1}\n", FileKind::Json),
+        ("k: 1\n", FileKind::Yaml),
+        ("k = 1\n", FileKind::Toml),
+    ] {
+        let src = line.repeat(HIGHLIGHT_LIMIT / line.len() + 100);
+        let out = data(&src, kind);
+        assert!(out.highlight_limited, "{kind:?}");
+        assert_eq!(out.body.matches(LIMIT_BANNER).count(), 1, "{kind:?}");
+        assert!(!out.body.contains(CSV_BANNER), "{kind:?}");
+        assert_eq!(visible(pre(&out.body)), src, "{kind:?}");
+    }
+
+    // CSV длиннее 64 КБ, но короче 2 МБ, раскрашен целиком
+    let row = "a;b\n";
+    let src = row.repeat(HIGHLIGHT_LIMIT / row.len() + 100);
+    let out = data(&src, FileKind::Csv);
+    assert!(!out.highlight_limited);
+    assert!(
+        !out.body.contains("Подсветка отключена"),
+        "{}",
+        &out.body[out.body.len() - 200..]
+    );
+    let last = "<span class=\"c0\">a</span><span class=\"d\">;</span><span class=\"c1\">b</span>\n";
+    assert!(
+        pre(&out.body).ends_with(last),
+        "{}",
+        &out.body[out.body.len() - 200..]
+    );
+    assert_eq!(visible(pre(&out.body)), src);
+
+    let src = row.repeat(CSV_COLOR_LIMIT / row.len() + 100);
+    let out = data(&src, FileKind::Csv);
+    assert!(out.highlight_limited);
+    assert!(
+        out.body.ends_with(&format!("</pre>{CSV_BANNER}</main>")),
+        "{}",
+        &out.body[out.body.len() - 200..]
+    );
+    assert!(!out.body.contains(LIMIT_BANNER));
+    assert_eq!(visible(pre(&out.body)), src);
 }

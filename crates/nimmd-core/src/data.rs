@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::csv::push_colored;
-use crate::highlight::{split_head, write_highlighted};
+use crate::highlight::{CSV_COLOR_LIMIT, HIGHLIGHT_LIMIT, split_head, write_highlighted};
 use crate::render::push_escaped;
 
 /// Тип исходного файла; всё, кроме `Markdown`, показывается как данные.
@@ -49,9 +49,14 @@ impl FileKind {
 /// `<pre class="data">` файла данных и баннер лимита подсветки; `true` — подсвечена только голова.
 pub(crate) fn push_data(out: &mut String, kind: FileKind, text: &str) -> bool {
     out.push_str("<pre class=\"data\">");
+    let limit = if kind == FileKind::Csv {
+        CSV_COLOR_LIMIT
+    } else {
+        HIGHLIGHT_LIMIT
+    };
     let (head, tail) = match kind {
         FileKind::Text | FileKind::Markdown => ("", text),
-        _ => split_head(text),
+        _ => split_head(text, limit),
     };
     if kind == FileKind::Csv {
         push_colored(out, head);
@@ -63,7 +68,19 @@ pub(crate) fn push_data(out: &mut String, kind: FileKind, text: &str) -> bool {
     out.push_str("</pre>");
     let limited = !head.is_empty() && !tail.is_empty();
     if limited {
-        out.push_str("<div class=\"banner\">Подсветка отключена после 2 МБ</div>");
+        out.push_str("<div class=\"banner\">Подсветка отключена после ");
+        out.push_str(&size(limit));
+        out.push_str("</div>");
     }
     limited
+}
+
+/// Размер лимита для баннера: до мебибайта — в КБ, иначе в МБ.
+fn size(bytes: usize) -> String {
+    const MIB: usize = 1024 * 1024;
+    if bytes < MIB {
+        format!("{} КБ", bytes / 1024)
+    } else {
+        format!("{} МБ", bytes / MIB)
+    }
 }

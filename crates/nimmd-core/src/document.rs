@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::data::{FileKind, push_data};
 use crate::detect::profile_of;
+use crate::highlight::Highlighter;
 use crate::profile::Profile;
 use crate::render::{MathMode, highlight_yaml, push_escaped, render_body};
 use crate::text::{
@@ -93,7 +94,8 @@ pub struct Rendered {
     pub truncated: bool,
     /// Текст первого заголовка уровня 1.
     pub title: Option<String>,
-    /// Файл данных длиннее `HIGHLIGHT_LIMIT`: подсвечена только голова.
+    /// Файл данных длиннее своего лимита (`HIGHLIGHT_LIMIT`, у CSV — `CSV_COLOR_LIMIT`): подсвечена
+    /// только голова; Markdown — часть кода сверх `MARKDOWN_HIGHLIGHT_LIMIT` выведена без подсветки.
     pub highlight_limited: bool,
 }
 
@@ -120,17 +122,24 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
     }
     let (frontmatter, profile, title, highlight_limited) = if markdown {
         let (frontmatter, text) = split_frontmatter(src);
-        let parsed = render_body(text, opts.math, opts.remote_images);
+        // Frontmatter тратит лимит подсветки раньше блоков кода
+        let highlighter = Highlighter::default();
+        if let Some(fm) = frontmatter {
+            body.push_str("<pre class=\"frontmatter\">");
+            highlight_yaml(&mut body, yaml_of(fm), &highlighter);
+            body.push_str("</pre>");
+        }
+        let parsed = render_body(text, opts.math, opts.remote_images, &highlighter);
         let profile = opts
             .profile
             .unwrap_or_else(|| profile_of(frontmatter, text, parsed.math, parsed.mermaid));
-        if let Some(fm) = frontmatter {
-            body.push_str("<pre class=\"frontmatter\">");
-            highlight_yaml(&mut body, yaml_of(fm));
-            body.push_str("</pre>");
-        }
         body.push_str(&parsed.html);
-        (frontmatter, profile, parsed.title, false)
+        if parsed.highlight_limited {
+            body.push_str(
+                "<div class=\"banner\">Часть кода показана без подсветки: лимит 8 КБ на документ</div>",
+            );
+        }
+        (frontmatter, profile, parsed.title, parsed.highlight_limited)
     } else {
         let limited = push_data(&mut body, opts.kind, src);
         (None, Profile::default(), None, limited)

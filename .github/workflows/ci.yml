@@ -25,6 +25,11 @@ jobs:
           tool: just
       - run: just clippy
       - run: just test
+      # Порог Apple Silicon с запасом ×3; на общих x86-раннерах Linux и Windows он ненадёжен
+      - run: just bench-check
+        if: runner.os == 'macOS'
+        env:
+          NIMMD_BENCH_FACTOR: "3"
 
   lint:
     runs-on: ubuntu-latest

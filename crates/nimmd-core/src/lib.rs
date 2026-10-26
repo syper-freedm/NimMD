@@ -14,5 +14,5 @@ pub mod text;
 pub use data::FileKind;
 pub use detect::detect;
 pub use document::{AssetMode, RenderOptions, Rendered, Theme, render};
-pub use highlight::{HIGHLIGHT_LIMIT, Span, highlight};
+pub use highlight::{CSV_COLOR_LIMIT, HIGHLIGHT_LIMIT, MARKDOWN_HIGHLIGHT_LIMIT, Span, highlight};
 pub use render::{MathMode, render_fragment};

@@ -5,6 +5,10 @@ test:
 bench:
     cargo bench -p nimmd-core
 
+# Порог: медиана рендера каждого входа 1 МиБ ≤ 100 мс × NIMMD_BENCH_FACTOR (по умолчанию 1)
+bench-check:
+    cargo test --release -p nimmd-core --test perf -- --ignored --nocapture
+
 # Установка: cargo install cargo-insta
 snap:
     cargo insta test --accept -p nimmd-core
