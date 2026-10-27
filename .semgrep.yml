@@ -7,7 +7,11 @@ rules:
     languages: [regex]
     paths:
       include: ["/crates/nimmd-core/src/**"]
-    pattern-regex: '\bstd::(\{[^;]*)?\b(fs|net|process)\b'
+    pattern-either:
+      - pattern-regex: '\bstd\s*::\s*(\{[^;]*)?\b(fs|net|process)\b'
+      # Псевдоним, glob и `self` в фигурных скобках прячут fs за другим путём
+      - pattern-regex: '\bstd\s+as\b'
+      - pattern-regex: '\bstd\s*::\s*(\*|\{([^{};]*,)?\s*(self|\*)\b)'
 
   - id: nimmd-comrak-raw-html
     message: "Сырой HTML из Markdown в превью запрещён: comrak только с render.unsafe_ = false, иначе XSS в WebView"
@@ -15,7 +19,8 @@ rules:
     languages: [regex]
     paths:
       include: ["*.rs"]
-    pattern-regex: '\b(r#unsafe|unsafe_)\s*[:=]\s*true\b'
+    # Любое значение, кроме литерала false: переменная, `!false`, `false || x`
+    pattern-regex: '\b(r#unsafe|unsafe_)\s*[:=](?!=)(?!\s*false\b\s*[^|&\s])'
 
   - id: nimmd-dom-html-sink
     message: "HTML в DOM вставляется только через DOM API (createElement, DOMParser + importNode) или textContent; строку из документа в innerHTML не писать"
@@ -27,6 +32,10 @@ rules:
       - pattern-either:
           - pattern: $E.innerHTML = $V
           - pattern: $E.outerHTML = $V
+          - pattern: $E["innerHTML"] = $V
+          - pattern: $E["outerHTML"] = $V
+          - pattern: 'Object.assign(..., {..., innerHTML: $V, ...}, ...)'
+          - pattern: 'Object.assign(..., {..., outerHTML: $V, ...}, ...)'
           - pattern: $E.insertAdjacentHTML(...)
           - pattern: document.write(...)
           - pattern: document.writeln(...)
