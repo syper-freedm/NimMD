@@ -471,7 +471,12 @@ fn fixtures_match_profiles() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut checked = 0;
     for group in fs::read_dir(&root).unwrap() {
-        for entry in fs::read_dir(group.unwrap().path()).unwrap() {
+        let group = group.unwrap().path();
+        // Файлы рядом с группами (`.DS_Store` от Finder) — не группы
+        if !group.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(group).unwrap() {
             let md = entry.unwrap().path();
             if md.extension().is_none_or(|ext| ext != "md") {
                 continue;
