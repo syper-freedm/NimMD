@@ -28,7 +28,9 @@ pub const MARKDOWN_HIGHLIGHT_LIMIT: usize = 8 * 1024;
 /// Участок кода с неизменным стеком scope; смещения — в UTF-16 от начала кода.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Span {
+    /// Начало участка.
     pub start: u32,
+    /// Конец участка, не включая.
     pub end: u32,
     /// Атомы scope стека снаружи внутрь через пробел, без повторов.
     pub class: String,
@@ -37,7 +39,7 @@ pub struct Span {
 /// Спаны подсветки кода для редактора.
 ///
 /// Тотальна: при ошибке syntect или без грамматики — пустой `Vec`. Подсвечивается голова
-/// не длиннее [`HIGHLIGHT_LIMIT`] (по правилу [`split_head`]), дальше спанов нет.
+/// не длиннее [`HIGHLIGHT_LIMIT`] (до последнего `\n` в пределе), дальше спанов нет.
 pub fn highlight(lang: &str, code: &str) -> Vec<Span> {
     spans(lang, split_head(code, HIGHLIGHT_LIMIT).0).unwrap_or_default()
 }

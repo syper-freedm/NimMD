@@ -9,10 +9,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Dialect {
+    /// `CommonMark` без расширений.
     #[default]
     CommonMark,
+    /// GitHub Flavored Markdown.
     Gfm,
+    /// `MultiMarkdown`.
     MultiMarkdown,
+    /// Obsidian.
     Obsidian,
 }
 
@@ -50,14 +54,23 @@ impl FromStr for Dialect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Features {
+    /// YAML между строками `---` в начале.
     pub frontmatter: bool,
+    /// Формулы `$…$` и `$$…$$`: подключается KaTeX.
     pub math: bool,
+    /// Блоки ```` ```mermaid ````: подключается Mermaid.
     pub mermaid: bool,
+    /// Сноски `[^id]`.
     pub footnotes: bool,
+    /// Таблицы GFM.
     pub tables: bool,
+    /// Списки задач `- [ ]`.
     pub tasklists: bool,
+    /// Зачёркивание `~~…~~`.
     pub strikethrough: bool,
+    /// Вики-ссылки `[[…]]`.
     pub wikilinks: bool,
+    /// Алерты `> [!тип]`.
     pub callouts: bool,
 }
 
@@ -65,6 +78,8 @@ pub struct Features {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
+    /// Диалект.
     pub dialect: Dialect,
+    /// Расширения.
     pub features: Features,
 }

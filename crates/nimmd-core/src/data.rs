@@ -10,12 +10,18 @@ use crate::render::push_escaped;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FileKind {
+    /// Документ Markdown.
     #[default]
     Markdown,
+    /// TOML с подсветкой.
     Toml,
+    /// YAML с подсветкой.
     Yaml,
+    /// JSON с подсветкой.
     Json,
+    /// CSV с раскраской столбцов.
     Csv,
+    /// Простой текст без подсветки.
     Text,
 }
 

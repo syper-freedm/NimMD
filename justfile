@@ -14,13 +14,17 @@ snap:
     cargo insta test --accept -p nimmd-core
 
 # Все проверки кода: стиль, линтеры, инварианты проекта, зависимости, секреты, CI
-lint: fmt-check clippy semgrep deny vendor npm-licenses unused-deps secrets workflows
+lint: fmt-check clippy doc semgrep deny vendor npm-licenses unused-deps secrets workflows
 
 fmt-check:
     cargo fmt --all -- --check
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
+
+# rustdoc без предупреждений: битые и приватные ссылки в документации
+doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 # Инварианты проекта из .semgrep.yml (сеть не нужна) и тесты самих правил в tests/semgrep
 # (semgrep --test не принимает каталог при одном файле правил, поэтому по файлу; обычный scan пропускает tests/)

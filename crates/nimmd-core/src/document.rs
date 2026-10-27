@@ -24,9 +24,12 @@ const MIB: usize = 1024 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
+    /// По системной схеме.
     #[default]
     Auto,
+    /// Всегда светлая.
     Light,
+    /// Всегда тёмная.
     Dark,
 }
 
@@ -37,11 +40,17 @@ pub enum AssetMode {
     #[default]
     None,
     /// Файлы `katex.min.css`, `katex.min.js`, `mermaid.min.js` по адресу `base_url`.
-    Link { base_url: String },
+    Link {
+        /// Адрес каталога с файлами без завершающего `/`, того же origin, что страница.
+        base_url: String,
+    },
     /// Содержимое бандлов прямо в документе.
     Inline {
+        /// Содержимое `katex.min.css`.
         katex_css: String,
+        /// Содержимое `katex.min.js`.
         katex_js: String,
+        /// Содержимое `mermaid.min.js`.
         mermaid_js: String,
     },
 }
@@ -49,13 +58,18 @@ pub enum AssetMode {
 /// Опции [`render`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderOptions {
+    /// Тема оформления, атрибут `data-theme` у `<html>`.
     pub theme: Theme,
+    /// Как подключать KaTeX и Mermaid; CSS темы встраивается всегда.
     pub assets: AssetMode,
+    /// Вывод формул.
     pub math: MathMode,
     /// `false` — удалённые картинки заменяются плейсхолдером `remote-image`.
     pub remote_images: bool,
     /// Хост заменил нераспознанные байты на `U+FFFD`: показать баннер.
     pub not_utf8: bool,
+    /// Предел входа в байтах (по умолчанию [`text::MAX_BYTES`](crate::text::MAX_BYTES)):
+    /// длиннее — рендерится префикс по границе символа и баннер, `truncated = true`.
     pub max_bytes: usize,
     /// `None` — профиль определяет детектор.
     pub profile: Option<Profile>,
@@ -86,11 +100,15 @@ pub struct Rendered {
     pub html: String,
     /// `<main class="nimmd">…</main>` (у данных — `nimmd nimmd-data`) — та же подстрока, что в `html`.
     pub body: String,
+    /// Профиль документа: от него зависят только подключённые скрипты.
     pub profile: Profile,
     /// Frontmatter с разделителями, переносы `\n`.
     pub frontmatter: Option<String>,
+    /// Преобладающий стиль переносов исходника: хост сохраняет файл в нём же.
     pub line_ending: LineEnding,
+    /// У исходника был BOM.
     pub had_bom: bool,
+    /// Вход длиннее `max_bytes` и обрезан; баннер уже в `html` и `body`.
     pub truncated: bool,
     /// Текст первого заголовка уровня 1.
     pub title: Option<String>,
