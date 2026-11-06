@@ -9,7 +9,7 @@ build = "build.rs"
 
 [lib]
 name = "nimmd_ffi"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["staticlib", "rlib"]
 
 [lints]
 workspace = true

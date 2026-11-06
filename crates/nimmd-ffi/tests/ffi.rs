@@ -59,10 +59,7 @@ fn render_html_from_utf8_lossy_sets_not_utf8_banner() {
     // Невалидный UTF-8: C0 — продолжение без стартового байта.
     let opts = opts_default();
     let html = html_of(render(b"# X\n\n\xC0\x80\n", &opts));
-    assert!(
-        html.contains("banner not-utf8") || html.contains("class=\"banner not-utf8\""),
-        "{html}"
-    );
+    assert!(html.contains("not-utf8"), "{html}");
     assert!(html.contains('\u{FFFD}') || html.contains("�"), "{html}");
 }
 

@@ -10,7 +10,6 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::slice;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use nimmd_assets::{AssetBudget, read_asset};
@@ -53,46 +52,29 @@ pub struct NimmdRenderOptions {
     pub extension: *const c_char,
 }
 
-struct AssetState {
-    doc: Option<PathBuf>,
-    budget: AssetBudget,
-}
-
-impl AssetState {
-    fn new() -> Self {
-        Self {
-            doc: None,
-            budget: AssetBudget::new(),
-        }
-    }
-
-    fn budget_for(&mut self, doc: &Path) -> &mut AssetBudget {
-        if self.doc.as_ref().is_none_or(|d| d != doc) {
-            self.doc = Some(doc.to_path_buf());
-            self.budget = AssetBudget::new();
-        }
-        &mut self.budget
-    }
-
-    fn reset_for(&mut self, doc: &Path) {
-        self.doc = Some(doc.to_path_buf());
-        self.budget = AssetBudget::new();
-    }
-}
-
 // ponytail: один бюджет на процесс — каждый FFI-вызов поднимает новый поток 64 МБ
-fn asset_state() -> &'static Mutex<AssetState> {
-    static STATE: OnceLock<Mutex<AssetState>> = OnceLock::new();
-    STATE.get_or_init(|| Mutex::new(AssetState::new()))
+fn asset_state() -> &'static Mutex<(Option<PathBuf>, AssetBudget)> {
+    static STATE: OnceLock<Mutex<(Option<PathBuf>, AssetBudget)>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new((None, AssetBudget::new())))
 }
 
-/// Тестовый крючок: следующий вызов `nimmd_render_html` паникует внутри `catch_unwind`.
-static PANIC_NEXT_RENDER: AtomicBool = AtomicBool::new(false);
-
-/// Включает одноразовую панику в следующем `nimmd_render_html` (только тесты).
 #[cfg(test)]
-pub fn test_arm_panic_next_render() {
-    PANIC_NEXT_RENDER.store(true, Ordering::SeqCst);
+mod panic_hook {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static PANIC_NEXT_RENDER: AtomicBool = AtomicBool::new(false);
+
+    /// Включает одноразовую панику в следующем `nimmd_render_html` (только тесты).
+    pub fn arm() {
+        PANIC_NEXT_RENDER.store(true, Ordering::SeqCst);
+    }
+
+    pub fn maybe_panic() {
+        assert!(
+            !PANIC_NEXT_RENDER.swap(false, Ordering::SeqCst),
+            "nimmd-ffi: test panic"
+        );
+    }
 }
 
 /// Рендерит байты файла в полный HTML-документ.
@@ -117,7 +99,7 @@ pub unsafe extern "C" fn nimmd_render_html(
     // SAFETY: caller гарантирует валидность `bytes`/`len` на время вызова.
     let input = unsafe { copy_bytes(bytes, len) };
     // SAFETY: `path` — NULL или валидная C-строка.
-    let path_buf = unsafe { optional_path(path) };
+    let path_buf = unsafe { c_path(path) };
     // SAFETY: `opts` — NULL или валидный `NimmdRenderOptions` со строками.
     let parsed = unsafe { parse_options(opts) };
     let Some(options) = parsed else {
@@ -182,14 +164,12 @@ pub unsafe extern "C" fn nimmd_buffer_free(buf: *mut NimmdBuffer) {
 }
 
 fn render_html_inner(input: &[u8], path: Option<&Path>, mut options: RenderOptions) -> Box<[u8]> {
-    // Намеренная паника для проверки catch_unwind (в т.ч. release).
-    assert!(
-        !PANIC_NEXT_RENDER.swap(false, Ordering::SeqCst),
-        "nimmd-ffi: test panic"
-    );
+    #[cfg(test)]
+    panic_hook::maybe_panic();
     if let Some(p) = path {
         if let Ok(mut state) = asset_state().lock() {
-            state.reset_for(p);
+            state.0 = Some(p.to_path_buf());
+            state.1 = AssetBudget::new();
         }
     }
     let (text, not_utf8) = decode_lossy(input);
@@ -200,8 +180,11 @@ fn render_html_inner(input: &[u8], path: Option<&Path>, mut options: RenderOptio
 
 fn read_asset_inner(doc: &Path, href: &str) -> Option<Box<[u8]>> {
     let mut state = asset_state().lock().ok()?;
-    let budget = state.budget_for(doc);
-    read_asset(doc, href, budget)
+    if state.0.as_ref().is_none_or(|d| d != doc) {
+        state.0 = Some(doc.to_path_buf());
+        state.1 = AssetBudget::new();
+    }
+    read_asset(doc, href, &mut state.1)
         .ok()
         .map(Vec::into_boxed_slice)
 }
@@ -295,11 +278,6 @@ unsafe fn parse_options(opts: *const NimmdRenderOptions) -> Option<RenderOptions
     })
 }
 
-unsafe fn optional_path(path: *const c_char) -> Option<PathBuf> {
-    // SAFETY: делегирует проверку NULL / UTF-8 в `c_path`.
-    unsafe { c_path(path) }
-}
-
 unsafe fn c_path(ptr: *const c_char) -> Option<PathBuf> {
     // SAFETY: делегирует проверку NULL / UTF-8 в `c_str`.
     unsafe { c_str(ptr) }.map(PathBuf::from)
@@ -342,7 +320,7 @@ mod unit {
 
     #[test]
     fn panic_in_render_is_caught_and_returns_null() {
-        test_arm_panic_next_render();
+        panic_hook::arm();
         let src = b"# panic please\n";
         let opts = NimmdRenderOptions {
             version: NIMMD_RENDER_OPTIONS_VERSION,
