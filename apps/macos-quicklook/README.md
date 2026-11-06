@@ -5,24 +5,29 @@ View-based Quick Look (ADR-003 / #50): `NSViewController` + `WKWebView`, ядр�
 ## Сборка (macOS)
 
 ```bash
-just vendor
-apps/macos-quicklook/Scripts/sync-vendor.sh
-apps/macos-quicklook/Scripts/build-ffi.sh
-cd apps/macos-quicklook && xcodegen generate
-xcodebuild -project NimMDQuickLook.xcodeproj -scheme NimMD -configuration Release build
-codesign -s - --force --deep build/Release/NimMD.app   # пути Xcode могут отличаться
+just ql-prep          # vendor + libnimmd_ffi.a + xcodegen
+xcodebuild -project apps/macos-quicklook/NimMDQuickLook.xcodeproj -scheme NimMD -configuration Release build
+codesign -s - --force --deep …/NimMD.app
 ```
 
-Контейнер `NimMD.app` нужен, чтобы система зарегистрировала appex. UI приложения — вне #50.
+`project.yml` также гоняет `build-ffi.sh` / `sync-vendor.sh` как pre-build. Контейнер `NimMD.app` регистрирует appex; UI приложения — вне #50.
 
 ## Контракт
 
 | Тема | Реализация |
 | --- | --- |
-| Рендер | `nimmd_render_html`, `max_bytes` = 10 МиБ, `AssetMode::Link` → `nimmd-asset://bundle` |
-| Картинки | `nimmd-asset://doc/…` → `nimmd_read_asset`; SVG только как `image/svg+xml` |
-| Сеть | entitlement `network.client` + `WKContentRuleList` (block http/https/ws/wss) |
+| Рендер | `nimmd_render_html`, чтение файла ≤ 10 МиБ, `AssetMode::Link` → `nimmd-asset://bundle` |
+| Картинки | `nimmd-asset://doc/…` → `nimmd_read_asset`; SVG только `image/svg+xml`; навигация после первого HTML отменена |
+| Сеть | `network.client` + `WKContentRuleList`; ошибка компиляции правил → fail closed |
 | Тема | `effectiveAppearance` → Light/Dark до render |
 | UTI | свои + markdown/json/csv; **без** `public.plain-text` |
 
-Проверка без Xcode: `apps/macos-quicklook/Scripts/verify.sh`.
+### Entitlement `/`
+
+`temporary-exception.files.absolute-path.read-only = ["/"]` — намеренно для v1: каталог документа неизвестен на этапе подписи, а `nimmd_read_asset` читает соседние картинки в любом пути Finder. Узкий путь в entitlements невыразим; сужение — follow-up, когда появится другой IPC.
+
+### `.txt` UTI
+
+`org.nimmd.plain-text` экспортируется только под `.txt` и не conforms to `public.plain-text`. Установка контейнера может повлиять на Launch Services для `.txt` — проверить на macOS перед широкой раздачей.
+
+Проверка без Xcode: `just ql-verify`.

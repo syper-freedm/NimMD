@@ -8,6 +8,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     private var completion: ((Error?) -> Void)?
     private var pendingHTML: String?
     private var rulesReady = false
+    private var allowInitialLoad = true
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -25,11 +26,12 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
         completion = handler
         scheme.documentPath = url.path
+        _ = url.startAccessingSecurityScopedResource()
 
         let theme: UInt8 =
             view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 2 : 1
 
-        guard let bytes = try? Data(contentsOf: url) else {
+        guard let bytes = Self.readCapped(url: url, maxBytes: Int(NimmdFFI.maxBytes)) else {
             finish(URLError(.cannotOpenFile))
             return
         }
@@ -56,24 +58,63 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         WKContentRuleListStore.default().compileContentRuleList(
             forIdentifier: "nimmd.offline",
             encodedContentRuleList: json
-        ) { [weak self] list, _ in
+        ) { [weak self] list, error in
+            guard let self else { return }
             if let list {
                 controller.add(list)
+                self.rulesReady = true
+                self.maybeLoad()
+            } else {
+                // Fail closed: без правил сеть с network.client не режется.
+                self.finish(error ?? URLError(.cannotLoadFromNetwork))
             }
-            self?.rulesReady = true
-            self?.maybeLoad()
         }
     }
 
     private func maybeLoad() {
         guard rulesReady, let html = pendingHTML else { return }
         pendingHTML = nil
+        allowInitialLoad = true
         webView.loadHTMLString(html, baseURL: URL(string: "nimmd-asset://doc/")!)
     }
 
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        // Subresource (img/script) не main frame — scheme handler. Main frame только первый loadHTMLString.
+        // SEC-002: клик по .svg / ссылке не должен открывать SVG-как-документ.
+        let isMain = navigationAction.targetFrame?.isMainFrame ?? true
+        if isMain {
+            if allowInitialLoad {
+                allowInitialLoad = false
+                decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
+            }
+            return
+        }
+        decisionHandler(.cancel)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        // ADR-003: completion после didFinish; короткая пауза — KaTeX/Mermaid на DOMContentLoaded.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        // ADR-003: ждать KaTeX/Mermaid, не фиксированные 50 мс.
+        let script = """
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          const pendingMath = [...document.querySelectorAll('[data-math-style]')].some(
+            (el) => !el.querySelector('.katex') && (el.textContent || '').trim().length > 0
+          );
+          const pendingMermaid = [...document.querySelectorAll('pre.mermaid')].some(
+            (el) => !el.querySelector('svg')
+          );
+          if (!pendingMath && !pendingMermaid) break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return true;
+        """
+        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] _ in
             self?.finish(nil)
         }
     }
@@ -94,5 +135,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
         let handler = completion
         completion = nil
         handler?(error)
+    }
+
+    /// Читает не больше `maxBytes` байт — FFI всё равно обрежет, но appex не тянет весь файл в RAM.
+    private static func readCapped(url: URL, maxBytes: Int) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: maxBytes) else { return nil }
+        return data
     }
 }

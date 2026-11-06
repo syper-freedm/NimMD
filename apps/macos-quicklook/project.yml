@@ -58,11 +58,28 @@ targets:
           - "$(SRCROOT)/../../crates/nimmd-ffi/include"
         LIBRARY_SEARCH_PATHS:
           - "$(SRCROOT)/Build/ffi"
+        # rustc --print=native-static-libs для apple-darwin staticlib
         OTHER_LDFLAGS:
           - "-lnimmd_ffi"
-          - "-lc++"
+          - "-framework"
+          - "Security"
+          - "-framework"
+          - "CoreFoundation"
+          - "-framework"
+          - "SystemConfiguration"
         CLANG_ENABLE_MODULES: true
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+    preBuildScripts:
+      - name: Build nimmd-ffi
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          "$SRCROOT/Scripts/build-ffi.sh"
+      - name: Sync vendor
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          "$SRCROOT/Scripts/sync-vendor.sh"
 schemes:
   NimMD:
     build:

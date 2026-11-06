@@ -5,7 +5,22 @@ import WebKit
 /// `nimmd-asset://bundle/…` — vendor из бандла; `nimmd-asset://doc/…` — картинки через FFI.
 /// SVG отдаётся только как `image/svg+xml` (SEC-002: не вставлять разметку в DOM).
 final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
-    var documentPath: String?
+    private let lock = NSLock()
+    private var documentPathValue: String?
+    private var stopped = NSHashTable<AnyObject>.weakObjects()
+
+    var documentPath: String? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return documentPathValue
+        }
+        set {
+            lock.lock()
+            documentPathValue = newValue
+            lock.unlock()
+        }
+    }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
         guard let url = urlSchemeTask.request.url else {
@@ -14,44 +29,64 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
         }
         let host = url.host ?? ""
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let doc = documentPath
 
         let payload: (Data, String)?
         switch host {
         case "bundle":
             payload = Self.bundleFile(named: path)
         case "doc":
-            guard let doc = documentPath, !path.isEmpty,
+            guard let doc, !path.isEmpty,
                   let data = NimmdFFI.readAsset(docPath: doc, href: path)
             else {
-                urlSchemeTask.didFailWithError(URLError(.cannotOpenFile))
+                failIfActive(urlSchemeTask, URLError(.cannotOpenFile))
                 return
             }
             payload = (data, Self.mime(for: path))
         default:
-            urlSchemeTask.didFailWithError(URLError(.badURL))
+            failIfActive(urlSchemeTask, URLError(.badURL))
             return
         }
 
         guard let (data, mime) = payload else {
-            urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
+            failIfActive(urlSchemeTask, URLError(.fileDoesNotExist))
             return
         }
 
-        let encoding: String? =
-            (mime.hasPrefix("text") || mime.contains("javascript") || mime == "application/json")
-            ? "utf-8" : nil
-        let response = URLResponse(
+        guard !isStopped(urlSchemeTask) else { return }
+
+        let response = HTTPURLResponse(
             url: url,
-            mimeType: mime,
-            expectedContentLength: data.count,
-            textEncodingName: encoding
-        )
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "Content-Type": mime,
+                "Content-Length": String(data.count),
+            ]
+        )!
         urlSchemeTask.didReceive(response)
+        guard !isStopped(urlSchemeTask) else { return }
         urlSchemeTask.didReceive(data)
+        guard !isStopped(urlSchemeTask) else { return }
         urlSchemeTask.didFinish()
     }
 
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {}
+    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
+        lock.lock()
+        stopped.add(urlSchemeTask as AnyObject)
+        lock.unlock()
+    }
+
+    private func isStopped(_ task: any WKURLSchemeTask) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopped.contains(task as AnyObject)
+    }
+
+    private func failIfActive(_ task: any WKURLSchemeTask, _ error: Error) {
+        guard !isStopped(task) else { return }
+        task.didFailWithError(error)
+    }
 
     private static func bundleFile(named relative: String) -> (Data, String)? {
         guard let root = Bundle.main.resourceURL?.appendingPathComponent("Vendor", isDirectory: true)

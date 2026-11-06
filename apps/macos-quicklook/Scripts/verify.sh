@@ -42,6 +42,21 @@ if ! grep -q 'com.apple.security.network.client' "$ROOT/QuickLook/NimMDQuickLook
   fail=1
 fi
 
+if ! grep -q 'HTTPURLResponse' "$ROOT/QuickLook/AssetSchemeHandler.swift"; then
+  echo "AssetSchemeHandler: expected HTTPURLResponse" >&2
+  fail=1
+fi
+
+if ! grep -q 'decidePolicyFor' "$ROOT/QuickLook/PreviewViewController.swift"; then
+  echo "PreviewViewController: expected decidePolicyFor (SEC-002)" >&2
+  fail=1
+fi
+
+if ! grep -q 'readCapped\|read(upToCount' "$ROOT/QuickLook/PreviewViewController.swift"; then
+  echo "PreviewViewController: expected capped file read" >&2
+  fail=1
+fi
+
 python3 - <<'PY' "$ROOT/QuickLook/Info.plist" "$ROOT/Host/Info.plist" "$ROOT/QuickLook/NimMDQuickLook.entitlements" "$ROOT/Host/NimMD.entitlements"
 import plistlib, sys
 for path in sys.argv[1:]:
