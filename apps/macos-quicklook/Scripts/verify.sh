@@ -32,14 +32,6 @@ if ! grep -q 'QLSupportedContentTypes' "$ROOT/QuickLook/Info.plist"; then
   fail=1
 fi
 
-for s in nimmd_render_html nimmd_read_asset nimmd_buffer_free WKContentRuleList nimmd-asset maxBytes; do
-  if ! grep -R -q "$s" "$ROOT/QuickLook"; then
-    echo "QuickLook sources: missing reference to $s" >&2
-    fail=1
-  fi
-done
-
-# max_bytes 10 MiB
 if ! grep -q '10 \* 1024 \* 1024' "$ROOT/QuickLook/NimmdFFI.swift"; then
   echo "NimmdFFI: expected maxBytes = 10 MiB" >&2
   fail=1

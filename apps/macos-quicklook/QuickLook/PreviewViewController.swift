@@ -72,15 +72,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController, WKN
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        // ADR-003: completion только после didFinish (+ короткая пауза для KaTeX/Mermaid).
-        let script = """
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        if (document.querySelector('[data-math-style], pre.mermaid')) {
-          await new Promise((r) => setTimeout(r, 50));
-        }
-        return true;
-        """
-        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] _ in
+        // ADR-003: completion после didFinish; короткая пауза — KaTeX/Mermaid на DOMContentLoaded.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.finish(nil)
         }
     }

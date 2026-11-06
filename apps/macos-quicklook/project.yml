@@ -63,7 +63,6 @@ targets:
           - "-lc++"
         CLANG_ENABLE_MODULES: true
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
-    dependencies: []
 schemes:
   NimMD:
     build:

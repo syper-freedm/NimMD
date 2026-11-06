@@ -54,47 +54,15 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {}
 
     private static func bundleFile(named relative: String) -> (Data, String)? {
-        let ns = relative as NSString
-        let file = ns.lastPathComponent as NSString
-        let name = file.deletingPathExtension
-        let ext = file.pathExtension
-        let dir = ns.deletingLastPathComponent
-        let sub = dir.isEmpty ? "Vendor" : "Vendor/\(dir)"
-        let url =
-            Bundle.main.url(
-                forResource: name,
-                withExtension: ext.isEmpty ? nil : ext,
-                subdirectory: sub
-            )
-            ?? Bundle.main.url(
-                forResource: name,
-                withExtension: ext.isEmpty ? nil : ext,
-                subdirectory: "Vendor"
-            )
-        guard let url, let data = try? Data(contentsOf: url) else {
-            return nil
-        }
+        guard let root = Bundle.main.resourceURL?.appendingPathComponent("Vendor", isDirectory: true)
+        else { return nil }
+        let file = root.appendingPathComponent(relative)
+        guard let data = try? Data(contentsOf: file) else { return nil }
         return (data, mime(for: relative))
     }
 
     private static func mime(for path: String) -> String {
         let ext = (path as NSString).pathExtension.lowercased()
-        switch ext {
-        case "css": return "text/css"
-        case "js": return "text/javascript"
-        case "woff2": return "font/woff2"
-        case "woff": return "font/woff"
-        case "ttf": return "font/ttf"
-        case "png": return "image/png"
-        case "jpg", "jpeg": return "image/jpeg"
-        case "gif": return "image/gif"
-        case "webp": return "image/webp"
-        case "svg": return "image/svg+xml"
-        default:
-            if let ut = UTType(filenameExtension: ext), let mime = ut.preferredMIMEType {
-                return mime
-            }
-            return "application/octet-stream"
-        }
+        return UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
     }
 }

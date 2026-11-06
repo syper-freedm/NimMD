@@ -5,19 +5,6 @@ enum NimmdFFI {
     static let maxBytes: UInt64 = 10 * 1024 * 1024
     static let bundleBaseURL = "nimmd-asset://bundle"
 
-    struct Buffer {
-        let data: Data
-        fileprivate init(_ buf: UnsafeMutablePointer<NimmdBuffer>) {
-            let len = buf.pointee.len
-            if len == 0 || buf.pointee.data == nil {
-                data = Data()
-            } else {
-                data = Data(bytes: buf.pointee.data, count: len)
-            }
-            nimmd_buffer_free(buf)
-        }
-    }
-
     /// Рендер файла в HTML. `theme`: 0 auto, 1 light, 2 dark.
     static func renderHTML(
         bytes: Data,
@@ -48,7 +35,12 @@ enum NimmdFFI {
                         ) else {
                             return nil
                         }
-                        return Buffer(buf).data
+                        defer { nimmd_buffer_free(buf) }
+                        let len = buf.pointee.len
+                        if len == 0 || buf.pointee.data == nil {
+                            return Data()
+                        }
+                        return Data(bytes: buf.pointee.data, count: len)
                     }
                 }
             }
@@ -61,7 +53,12 @@ enum NimmdFFI {
                 guard let buf = nimmd_read_asset(docPtr, hrefPtr) else {
                     return nil
                 }
-                return Buffer(buf).data
+                defer { nimmd_buffer_free(buf) }
+                let len = buf.pointee.len
+                if len == 0 || buf.pointee.data == nil {
+                    return Data()
+                }
+                return Data(bytes: buf.pointee.data, count: len)
             }
         }
     }
