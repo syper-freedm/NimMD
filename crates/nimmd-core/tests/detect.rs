@@ -1,3 +1,5 @@
+mod support;
+
 use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -5,6 +7,7 @@ use std::time::{Duration, Instant};
 use nimmd_core::detect;
 use nimmd_core::profile::{Dialect, Features, Profile};
 use nimmd_core::text::{normalize_newlines, split_frontmatter};
+use support::{Rng, markdown_fixtures};
 
 fn profile(dialect: Dialect, features: Features) -> Profile {
     Profile { dialect, features }
@@ -428,18 +431,6 @@ fn deep_nesting_is_fast() {
     assert_eq!(detect("> > > текст"), Profile::default());
 }
 
-/// Детерминированный генератор (xorshift64), чтобы падение воспроизводилось.
-struct Rng(u64);
-
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
-}
-
 const PIECES: [&str; 28] = [
     "[[", "]]", "%%", "~~", "```", "~~~", "> ", "[!", "#", "|", "-", ":", "$", "[^", "]",
     "http://", "(", "<", "\n", " ", "\t", "x", "é", "{#", "}", "Title: ", "---\n", "1. ",
@@ -470,28 +461,17 @@ fn detect_is_total_on_random_input() {
 fn fixtures_match_profiles() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut checked = 0;
-    for group in fs::read_dir(&root).unwrap() {
-        let group = group.unwrap().path();
-        // Файлы рядом с группами (`.DS_Store` от Finder) — не группы
-        if !group.is_dir() {
-            continue;
-        }
-        for entry in fs::read_dir(group).unwrap() {
-            let md = entry.unwrap().path();
-            if md.extension().is_none_or(|ext| ext != "md") {
-                continue;
-            }
-            let name = md.strip_prefix(&root).unwrap().display().to_string();
-            let expected = md.with_extension("profile.json");
-            let expected = fs::read_to_string(&expected)
-                .unwrap_or_else(|e| panic!("{name}: нет {}: {e}", expected.display()));
-            let expected: Profile = serde_json::from_str(&expected)
-                .unwrap_or_else(|e| panic!("{name}: неверный .profile.json: {e}"));
-            // Checkout с autocrlf на Windows даёт `\r\n`, а `detect` ждёт `\n`.
-            let src = fs::read_to_string(&md).unwrap();
-            assert_eq!(detect(&normalize_newlines(&src)), expected, "{name}");
-            checked += 1;
-        }
+    for md in markdown_fixtures(&root).unwrap() {
+        let name = md.strip_prefix(&root).unwrap().display().to_string();
+        let expected = md.with_extension("profile.json");
+        let expected = fs::read_to_string(&expected)
+            .unwrap_or_else(|e| panic!("{name}: нет {}: {e}", expected.display()));
+        let expected: Profile = serde_json::from_str(&expected)
+            .unwrap_or_else(|e| panic!("{name}: неверный .profile.json: {e}"));
+        // Checkout с autocrlf на Windows даёт `\r\n`, а `detect` ждёт `\n`.
+        let src = fs::read_to_string(&md).unwrap();
+        assert_eq!(detect(&normalize_newlines(&src)), expected, "{name}");
+        checked += 1;
     }
     assert!(checked > 0, "в {} нет фикстур", root.display());
 }

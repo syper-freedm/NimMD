@@ -17,14 +17,7 @@ const result = await build({
   outfile: join(here, "dist/mermaid.min.js"),
   metafile: true,
   legalComments: "external",
-  plugins: [
-    {
-      name: "elk-stub",
-      setup(b) {
-        b.onResolve({ filter: /^elkjs(\/|$)/ }, () => ({ path: elkStub }));
-      },
-    },
-  ],
+  alias: { "elkjs/lib/elk.bundled.js": elkStub },
 });
 
 const elk = Object.keys(result.metafile.inputs).filter((p) => p.replaceAll("\\", "/").includes("node_modules/elkjs/"));

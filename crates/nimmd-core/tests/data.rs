@@ -1,3 +1,5 @@
+mod support;
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -8,6 +10,7 @@ use nimmd_core::{
     AssetMode, CSV_COLOR_LIMIT, FileKind, HIGHLIGHT_LIMIT, MARKDOWN_HIGHLIGHT_LIMIT, RenderOptions,
     Rendered, render,
 };
+use support::Rng;
 
 const MIB: usize = 1024 * 1024;
 const DATA_CSS: &str = include_str!("../../../packages/theme/data.css");
@@ -534,17 +537,7 @@ fn csv_fixtures_keep_text() {
     assert!(seen >= 4, "фикстур: {seen}");
 }
 
-/// Детерминированный генератор (xorshift) для случайных входов.
-struct Rng(u64);
-
 impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
-
     fn text(&mut self, alphabet: &[&str], len: usize) -> String {
         (0..len)
             .map(|_| {

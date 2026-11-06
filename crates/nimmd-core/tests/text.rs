@@ -1,3 +1,5 @@
+mod support;
+
 use std::borrow::Cow;
 
 use nimmd_core::profile::Dialect;
@@ -5,6 +7,7 @@ use nimmd_core::text::{
     LineEnding, MAX_BYTES, MAX_NESTING, decode_lossy, detect_line_ending, frontmatter_dialect,
     limit_nesting, normalize_newlines, split_frontmatter, strip_bom, truncate_at_char_boundary,
 };
+use support::Rng;
 
 #[test]
 fn strip_bom_removes_one_leading_bom() {
@@ -199,18 +202,6 @@ fn limit_nesting_mixed_markers_and_lines() {
     );
     let crlf = "- ".repeat(MAX_NESTING) + "-\r\nx";
     assert_eq!(limit_nesting(&crlf), "- ".repeat(MAX_NESTING) + "\\-\r\nx");
-}
-
-/// Детерминированный генератор (xorshift64), чтобы падение воспроизводилось.
-struct Rng(u64);
-
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
 }
 
 fn random_string(rng: &mut Rng) -> String {

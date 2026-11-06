@@ -1,3 +1,5 @@
+mod support;
+
 use std::borrow::Cow;
 use std::time::{Duration, Instant};
 
@@ -5,6 +7,7 @@ use nimmd_core::detect;
 use nimmd_core::profile::Dialect;
 use nimmd_core::render_fragment;
 use nimmd_core::text::{MAX_NESTING, limit_nesting, split_frontmatter};
+use support::Rng;
 
 /// Значения атрибута `attr="…"` во всём фрагменте.
 fn attr_values<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
@@ -300,18 +303,6 @@ fn disabled_and_enabled_extensions() {
     let quote = render_fragment(">>>\nx\n>>>\n");
     assert_eq!(quote.matches("<blockquote>").count(), 1, "{quote}");
     assert!(quote.contains("<p>x</p>"), "{quote}");
-}
-
-/// Детерминированный генератор (xorshift64), чтобы падение воспроизводилось.
-struct Rng(u64);
-
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
 }
 
 const PIECES: [&str; 26] = [

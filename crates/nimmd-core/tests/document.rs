@@ -1,3 +1,5 @@
+mod support;
+
 use std::fs;
 use std::path::Path;
 
@@ -7,6 +9,7 @@ use nimmd_core::{
     AssetMode, MARKDOWN_HIGHLIGHT_LIMIT, MathMode, RenderOptions, Rendered, Theme, detect, render,
     render_fragment,
 };
+use support::{Rng, markdown_fixtures};
 
 const MIB: usize = 1024 * 1024;
 const NIMMD_CSS: &str = include_str!("../../../packages/theme/nimmd.css");
@@ -208,26 +211,15 @@ fn body_is_substring_and_profile_independent() {
 fn profile_matches_detect_on_fixtures() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let mut checked = 0;
-    for group in fs::read_dir(&root).unwrap() {
-        let group = group.unwrap().path();
-        // Файлы рядом с группами (`.DS_Store` от Finder) — не группы
-        if !group.is_dir() {
-            continue;
-        }
-        for entry in fs::read_dir(group).unwrap() {
-            let md = entry.unwrap().path();
-            if md.extension().is_none_or(|ext| ext != "md") {
-                continue;
-            }
-            let name = md.strip_prefix(&root).unwrap().display().to_string();
-            let src = fs::read_to_string(&md).unwrap();
-            let expected = detect(&normalize_newlines(strip_bom(&src).1));
-            assert_eq!(render(&src, &opts()).profile, expected, "{name}");
-            // Тот же текст с BOM и CRLF
-            let crlf = format!("\u{FEFF}{}", normalize_newlines(&src).replace('\n', "\r\n"));
-            assert_eq!(render(&crlf, &opts()).profile, expected, "{name} (crlf)");
-            checked += 1;
-        }
+    for md in markdown_fixtures(&root).unwrap() {
+        let name = md.strip_prefix(&root).unwrap().display().to_string();
+        let src = fs::read_to_string(&md).unwrap();
+        let expected = detect(&normalize_newlines(strip_bom(&src).1));
+        assert_eq!(render(&src, &opts()).profile, expected, "{name}");
+        // Тот же текст с BOM и CRLF
+        let crlf = format!("\u{FEFF}{}", normalize_newlines(&src).replace('\n', "\r\n"));
+        assert_eq!(render(&crlf, &opts()).profile, expected, "{name} (crlf)");
+        checked += 1;
     }
     assert!(checked > 0, "в {} нет фикстур", root.display());
 }
@@ -783,18 +775,6 @@ fn defaults_match_design() {
     assert!(!d.remote_images && !d.not_utf8);
     assert_eq!(d.max_bytes, nimmd_core::text::MAX_BYTES);
     assert_eq!(d.profile, None);
-}
-
-/// Детерминированный генератор (xorshift64), чтобы падение воспроизводилось.
-struct Rng(u64);
-
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
 }
 
 const PIECES: [&str; 30] = [

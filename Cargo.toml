@@ -15,7 +15,7 @@ syntect = { version = "5.3", default-features = false, features = ["html", "pars
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 latex2mathml = "0.2"   # MathMode::MathML (спек 5.3, В2); MIT
-insta = { version = "1.49", features = ["yaml"] }
+insta = "1.49"
 criterion = "0.8"
 
 [workspace.lints.rust]
