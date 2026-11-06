@@ -1,0 +1,22 @@
+[package]
+name = "nimmd-ffi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "C ABI для Quick Look: рендер HTML и чтение картинок"
+build = "build.rs"
+
+[lib]
+name = "nimmd_ffi"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+nimmd-core = { path = "../nimmd-core" }
+nimmd-assets = { path = "../nimmd-assets" }
+
+[build-dependencies]
+cbindgen = "0.29"

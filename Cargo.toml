@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/nimmd-core", "crates/nimmd-assets"]
+members = ["crates/nimmd-core", "crates/nimmd-assets", "crates/nimmd-ffi"]
 resolver = "3"
 
 [workspace.package]
