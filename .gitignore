@@ -17,7 +17,10 @@ target
 rustc-ice-*.txt
 
 # Custom ignore rules
-docs/
+# Спеки/заметки агентов локальны; ADR коммитим (критерии приёмки #48).
+docs/**
+!docs/adr/
+!docs/adr/**
 .claude/
 .cursor/
 .agents/
