@@ -1,0 +1,74 @@
+# XcodeGen: (cd apps/macos-quicklook && xcodegen generate)
+name: NimMDQuickLook
+options:
+  bundleIdPrefix: org.nimmd
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+targets:
+  NimMD:
+    type: application
+    platform: macOS
+    sources:
+      - Host
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nimmd.app
+        INFOPLIST_FILE: Host/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Host/NimMD.entitlements
+        GENERATE_INFOPLIST_FILE: false
+        PRODUCT_NAME: NimMD
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+    dependencies:
+      - target: NimMDQuickLook
+        embed: true
+        codeSign: true
+  NimMDQuickLook:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: QuickLook
+        excludes:
+          - Vendor/**
+          - Info.plist
+          - "*.entitlements"
+          - Bridging-Header.h
+      - path: QuickLook/Vendor
+        type: folder
+        optional: true
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nimmd.app.QuickLookPreview
+        INFOPLIST_FILE: QuickLook/Info.plist
+        CODE_SIGN_ENTITLEMENTS: QuickLook/NimMDQuickLook.entitlements
+        GENERATE_INFOPLIST_FILE: false
+        PRODUCT_NAME: NimMDQuickLook
+        PRODUCT_MODULE_NAME: NimMDQuickLook
+        SWIFT_OBJC_BRIDGING_HEADER: QuickLook/Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - "$(SRCROOT)/Build/ffi"
+          - "$(SRCROOT)/../../crates/nimmd-ffi/include"
+        LIBRARY_SEARCH_PATHS:
+          - "$(SRCROOT)/Build/ffi"
+        OTHER_LDFLAGS:
+          - "-lnimmd_ffi"
+          - "-lc++"
+        CLANG_ENABLE_MODULES: true
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+    dependencies: []
+schemes:
+  NimMD:
+    build:
+      targets:
+        NimMD: all
+        NimMDQuickLook: all
+    run:
+      config: Debug

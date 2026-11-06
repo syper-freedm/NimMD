@@ -9,6 +9,7 @@
 - `crates/nimmd-core` — ядро: Markdown и файлы данных в HTML ([README](crates/nimmd-core/README.md)).
 - `crates/nimmd-assets` — безопасное чтение картинок, на которые ссылается документ.
 - `crates/nimmd-ffi` — C ABI (`nimmd_render_html`, `nimmd_read_asset`) для Swift Quick Look.
+- `apps/macos-quicklook` — `NimMDQuickLook.appex` (view-based WKWebView, ADR-003).
 - `packages/theme` — CSS тем и подсветки, скрипты инициализации KaTeX и Mermaid.
 - `packages/vendor` — сборка KaTeX и Mermaid без сети в рантайме.
 

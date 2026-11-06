@@ -60,3 +60,15 @@ workflows:
 # Встроенный дамп синтаксисов ядра: стандартный набор syntect и crates/nimmd-core/assets/syntaxes/
 syntaxes:
     cargo run -p nimmd-core --example build_syntaxes
+
+
+# Quick Look appex: структура и Info.plist без Xcode
+ql-verify:
+    bash apps/macos-quicklook/Scripts/verify.sh
+
+# macOS: vendor + libnimmd_ffi.a + xcodegen (см. apps/macos-quicklook/README.md)
+ql-prep:
+    just vendor
+    bash apps/macos-quicklook/Scripts/sync-vendor.sh
+    bash apps/macos-quicklook/Scripts/build-ffi.sh
+    cd apps/macos-quicklook && xcodegen generate

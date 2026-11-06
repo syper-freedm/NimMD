@@ -34,3 +34,7 @@ packages/vendor/dist/
 
 # Машинное состояние конвейера AFD (локально)
 tasks/*/control/
+apps/macos-quicklook/Build/
+apps/macos-quicklook/NimMDQuickLook.xcodeproj/
+apps/macos-quicklook/QuickLook/Vendor/**
+!apps/macos-quicklook/QuickLook/Vendor/.gitkeep
