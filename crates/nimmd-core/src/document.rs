@@ -1,12 +1,14 @@
 //! Полный HTML-документ: тема, ресурсы по профилю, баннеры.
 
+use std::fmt::Write;
+
 use serde::{Deserialize, Serialize};
 
 use crate::data::{FileKind, push_data};
 use crate::detect::profile_of;
 use crate::highlight::Highlighter;
 use crate::profile::Profile;
-use crate::render::{MathMode, highlight_yaml, push_escaped, render_body};
+use crate::render::{MathMode, push_escaped, render_body};
 use crate::text::{
     LineEnding, MAX_BYTES, detect_line_ending, normalize_newlines, split_frontmatter, strip_bom,
     truncate_at_char_boundary,
@@ -144,7 +146,8 @@ pub fn render(src: &str, opts: &RenderOptions) -> Rendered {
         let highlighter = Highlighter::default();
         if let Some(fm) = frontmatter {
             body.push_str("<pre class=\"frontmatter\">");
-            highlight_yaml(&mut body, yaml_of(fm), &highlighter);
+            // Запись в String не падает
+            let _ = highlighter.write(&mut body, "yaml", yaml_of(fm));
             body.push_str("</pre>");
         }
         let parsed = render_body(text, opts.math, opts.remote_images, &highlighter);
@@ -232,21 +235,16 @@ fn push_assets(html: &mut String, assets: &AssetMode, katex: bool, mermaid: bool
             let mut base = String::new();
             push_escaped(&mut base, base_url);
             if katex {
-                for part in [
-                    "<link rel=\"stylesheet\" href=\"",
-                    &base,
-                    "/katex.min.css\"><script defer src=\"",
-                    &base,
-                    "/katex.min.js\"></script>",
-                ] {
-                    html.push_str(part);
-                }
+                // Запись в String не падает; base уже экранирован
+                let _ = write!(
+                    html,
+                    "<link rel=\"stylesheet\" href=\"{base}/katex.min.css\">\
+                     <script defer src=\"{base}/katex.min.js\"></script>"
+                );
                 push_inline_script(html, KATEX_INIT);
             }
             if mermaid {
-                for part in ["<script src=\"", &base, "/mermaid.min.js\"></script>"] {
-                    html.push_str(part);
-                }
+                let _ = write!(html, "<script src=\"{base}/mermaid.min.js\"></script>");
                 push_inline_script(html, MERMAID_INIT);
             }
         }

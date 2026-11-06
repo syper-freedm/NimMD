@@ -10,6 +10,7 @@ use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::html;
 use serde::Serialize;
 use syntect::dumps::from_uncompressed_data;
+use syntect::easy::ScopeRangeIterator;
 use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::{ParseState, ScopeStack, SyntaxReference, SyntaxSet};
 use syntect::util::LinesWithEndings;
@@ -50,31 +51,26 @@ fn spans(lang: &str, code: &str) -> Option<Vec<Span>> {
     let mut stack = ScopeStack::new();
     let mut out: Vec<Span> = Vec::new();
     let mut offset = 0u32;
-    let mut push = |stack: &ScopeStack, text: &str| {
-        let start = offset;
-        offset = offset.saturating_add(u32::try_from(text.encode_utf16().count()).ok()?);
-        if text.is_empty() || stack.is_empty() {
-            return Some(());
-        }
-        let class = class_of(stack);
-        match out.last_mut() {
-            Some(last) if last.end == start && last.class == class => last.end = offset,
-            _ => out.push(Span {
-                start,
-                end: offset,
-                class,
-            }),
-        }
-        Some(())
-    };
     for line in LinesWithEndings::from(code) {
-        let mut pos = 0;
-        for (at, op) in state.parse_line(line, set).ok()? {
-            push(&stack, line.get(pos..at)?)?;
-            pos = at;
-            stack.apply(&op).ok()?;
+        let ops = state.parse_line(line, set).ok()?;
+        for (range, op) in ScopeRangeIterator::new(&ops, line) {
+            stack.apply(op).ok()?;
+            let text = line.get(range)?;
+            let start = offset;
+            offset = offset.saturating_add(u32::try_from(text.encode_utf16().count()).ok()?);
+            if text.is_empty() || stack.is_empty() {
+                continue;
+            }
+            let class = class_of(&stack);
+            match out.last_mut() {
+                Some(last) if last.end == start && last.class == class => last.end = offset,
+                _ => out.push(Span {
+                    start,
+                    end: offset,
+                    class,
+                }),
+            }
         }
-        push(&stack, line.get(pos..)?)?;
     }
     Some(out)
 }

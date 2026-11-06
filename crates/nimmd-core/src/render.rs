@@ -85,8 +85,7 @@ pub(crate) fn render_body(
         };
         if let Some(raw) = raw {
             node.data_mut().value = NodeValue::Raw(raw);
-            let children: Vec<_> = node.children().collect();
-            for child in children {
+            while let Some(child) = node.first_child() {
                 child.detach();
             }
         }
@@ -107,12 +106,6 @@ pub(crate) fn render_body(
         title: title.filter(|text: &String| !text.is_empty()),
         highlight_limited: highlighter.limited(),
     }
-}
-
-/// YAML frontmatter, подсвеченный CSS-классами syntect как блок кода `yaml`, под лимитом `highlighter`.
-pub(crate) fn highlight_yaml(out: &mut String, yaml: &str, highlighter: &Highlighter) {
-    // Запись в String не падает
-    let _ = highlighter.write(out, "yaml", yaml);
 }
 
 pub(crate) fn push_escaped(out: &mut String, text: &str) {
@@ -140,12 +133,7 @@ fn is_remote(url: &str) -> bool {
     let url = url.trim_start_matches(|c: char| c <= ' ');
     let scheme = url.split_once(':').map(|(scheme, _)| scheme);
     scheme.is_some_and(|s| s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https"))
-        || url
-            .chars()
-            .take(2)
-            .filter(|&c| c == '/' || c == '\\')
-            .count()
-            == 2
+        || matches!(url.as_bytes(), [b'/' | b'\\', b'/' | b'\\', ..])
 }
 
 /// HTML формулы в режиме `mode`; `None` — оставить `<span data-math-style>` comrak.

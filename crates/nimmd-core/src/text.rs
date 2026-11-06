@@ -37,18 +37,8 @@ pub fn strip_bom(src: &str) -> (bool, &str) {
 
 /// Преобладающий стиль переносов; при равенстве — `Lf`. Одиночный `\r` не считается.
 pub fn detect_line_ending(src: &str) -> LineEnding {
-    let (mut crlf, mut lf) = (0usize, 0usize);
-    let mut prev = 0u8;
-    for &b in src.as_bytes() {
-        if b == b'\n' {
-            if prev == b'\r' {
-                crlf += 1;
-            } else {
-                lf += 1;
-            }
-        }
-        prev = b;
-    }
+    let crlf = src.matches("\r\n").count();
+    let lf = src.bytes().filter(|&b| b == b'\n').count() - crlf;
     if crlf > lf {
         LineEnding::CrLf
     } else {
