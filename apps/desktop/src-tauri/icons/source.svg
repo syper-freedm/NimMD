@@ -1,4 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#245b83"/>
-  <path d="M128 384V128h64l128 160V128h64v256h-64L192 224v160z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>NimMD — иконка приложения</title>
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2=".75" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#316d94"/>
+      <stop offset=".52" stop-color="#245b83"/>
+      <stop offset="1" stop-color="#153e5d"/>
+    </linearGradient>
+    <linearGradient id="edge" x2="0" y2="1">
+      <stop stop-color="#5985a2"/>
+      <stop offset="1" stop-color="#123950"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b7ddef"/>
+      <stop offset="1" stop-color="#86b6d1"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#ink)" stroke="url(#edge)" stroke-width="3"
+        d="M352 101h320c92 0 145 8 191 54s60 99 60 197v320c0 98-14 151-60 197s-99 54-191 54H352c-92 0-145-8-191-54s-60-99-60-197V352c0-98 14-151 60-197s99-54 191-54z"/>
+  <g transform="translate(248 267)">
+    <path fill="#fff9ec" d="M0 0h152l224 291V0h152v488H376L152 197v291l-76-76-76 76z"/>
+    <path fill="url(#fold)" d="M0 0h152l376 488H376z"/>
+  </g>
 </svg>
