@@ -1,3 +1,0 @@
-{
-  "bundle": { "targets": ["app"], "macOS": { "minimumSystemVersion": "14.0" } }
-}

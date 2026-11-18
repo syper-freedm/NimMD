@@ -13,14 +13,16 @@
   "app": {
     "windows": [{ "label": "main", "title": "NimMD", "width": 960, "height": 720, "minWidth": 400, "minHeight": 300 }],
     "security": {
-      "csp": "default-src 'none'; img-src nimmd-asset: http://nimmd-asset.localhost data:; connect-src ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
-      "devCsp": "default-src 'none'; img-src nimmd-asset: http://nimmd-asset.localhost data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      "csp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      "devCsp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc: http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
       "capabilities": ["main"]
     }
   },
   "bundle": {
     "active": true,
-    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
+    "targets": ["app"],
+    "icon": ["icons/icon.png", "icons/icon.icns"],
+    "macOS": { "minimumSystemVersion": "14.0" },
     "fileAssociations": [
       { "ext": ["md", "markdown", "mdown", "mkd"], "name": "Markdown", "mimeType": "text/markdown", "role": "Editor" },
       { "ext": ["toml"], "name": "TOML", "mimeType": "application/toml", "role": "Viewer" },

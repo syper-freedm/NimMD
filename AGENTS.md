@@ -4,12 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Что это
 
-NimMD — быстрый лёгкий просмотрщик и редактор Markdown. Цель — одно Rust-ядро `nimmd-core`
+NimMD — быстрый лёгкий просмотрщик и редактор Markdown для macOS. Цель — одно Rust-ядро `nimmd-core`
 для двух хостов: `NimMD.app` (Tauri 2 + редактор на TS/CodeMirror 6, ядро в том же процессе)
-и Quick Look-расширение на Swift (через C ABI `nimmd-ffi`). Сейчас в репозитории есть только
-скелет `crates/nimmd-core` (типы профиля в `profile.rs`, предобработка текста в `text.rs`)
-и `packages/vendor` (сборка KaTeX и Mermaid). `apps/`, `nimmd-ffi`, `packages/theme` пока
-нет — их добавят по планам.
+и Quick Look-расширение на Swift (через C ABI `nimmd-ffi`). В репозитории есть ядро,
+`nimmd-assets`, каркас `apps/desktop`, тема и сборка KaTeX и Mermaid.
 
 Источники истины (локальные, `docs/` в `.gitignore`):
 - спек: `docs/superpowers/specs/2026-10-19-nimmd-design.md` — в коде и комментариях на него
@@ -33,8 +31,8 @@ cargo fmt --all
 ```
 
 `just lint` требует установленных `semgrep`, `cargo-deny`, `cargo-machete`, `gitleaks`,
-`actionlint`, `zizmor`, `pnpm` и сети (`vendor` ставит пакеты из npm, `deny` качает базу RustSec). CI (`.github/workflows/ci.yml`): `just clippy` + `just test`
-на macOS/Windows/Linux, `just lint` один раз на Linux.
+`actionlint`, `zizmor`, `pnpm` и сети (`vendor` ставит пакеты из npm, `deny` качает базу RustSec).
+В CI проверка приложения, тесты, бенчмарк и линтеры запускаются на macOS.
 
 ## Инварианты (ловятся линтерами — не обходить)
 
@@ -48,8 +46,8 @@ cargo fmt --all
   CSP WebView не ослабляется; WebView не получает плагины `fs/shell/process/http`. Все правила —
   в `.semgrep.yml`.
 - `unsafe` — только в будущих `nimmd-ffi` и `apps/desktop/src-tauri/src/platform/`, с `// SAFETY:`.
-  Платформенный код — только в `platform/`, `apps/macos-quicklook/`, `apps/windows-preview/`,
-  `scripts/*-<os>.sh`; остальное собирается на трёх ОС без `cfg`.
+  Интеграция с macOS живёт в `apps/desktop/src-tauri/src/platform/`,
+  `apps/macos-quicklook/` и `scripts/*-macos.sh`.
 - clippy `pedantic` + `-D warnings`. Правило ослабляется только точечным `#[allow(...)]` или
   `nosemgrep: <id>` с причиной рядом.
 - Лицензии: белый список в `deny.toml` общий для crates и npm (`scripts/check-npm-licenses.mjs`).

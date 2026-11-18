@@ -1,9 +1,6 @@
-use std::{ffi::OsString, io, path::Path};
+use std::{ffi::OsString, io, os::unix::ffi::OsStringExt, path::Path};
 
-use nimmd_desktop::{
-    app::launch::{Launch, Mode},
-    platform::{NativePlatform, Platform},
-};
+use nimmd_desktop::app::launch::{Launch, Mode};
 
 fn parse(args: &[&str]) -> io::Result<Launch> {
     Launch::parse(args.iter().map(OsString::from))
@@ -62,12 +59,11 @@ fn mode_and_path_reach_the_ipc_payload_and_window_title() {
 }
 
 #[test]
-fn metadata_stub_reports_unsupported() {
+fn rejects_non_utf8_path() {
     assert_eq!(
-        NativePlatform
-            .copy_metadata(Path::new("src"), Path::new("dst"))
+        Launch::parse([OsString::from_vec(vec![0xff])])
             .unwrap_err()
             .kind(),
-        io::ErrorKind::Unsupported
+        io::ErrorKind::InvalidInput
     );
 }

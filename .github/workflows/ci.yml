@@ -1,5 +1,3 @@
-# Переносимость с первого дня (спек 9): ядро, Tauri и frontend проверяются на трёх ОС.
-# Проверки just lint не зависят от ОС и идут один раз, на Linux.
 name: CI
 
 on:
@@ -11,11 +9,7 @@ permissions:
 
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,22 +23,16 @@ jobs:
           package-manager-cache: false
       - name: Установить pnpm
         run: npm install --global pnpm@12.18.0 # zizmor: ignore[adhoc-packages] версия закреплена
-      - name: Установить системные библиотеки Tauri
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - run: just desktop-check
       - run: just clippy
       - run: just test
-      # Порог Apple Silicon с запасом ×3; на общих x86-раннерах Linux и Windows он ненадёжен
+      # Порог Apple Silicon с запасом ×3 для общего раннера.
       - run: just bench-check
-        if: runner.os == 'macOS'
         env:
           NIMMD_BENCH_FACTOR: "3"
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,15 +45,12 @@ jobs:
         with:
           node-version: "26.13.0"
           package-manager-cache: false
-      - name: Установить системные библиотеки Tauri
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - name: Установить semgrep, gitleaks, actionlint, pnpm
         run: | # zizmor: ignore[adhoc-packages] pnpm закреплён точной версией
           pipx install semgrep==1.182.0
           go install github.com/zricethezav/gitleaks/v8@v8.30.1
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           npm install -g pnpm@12.18.0
+          pipx environment --value PIPX_BIN_DIR >> "$GITHUB_PATH"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - run: just lint
