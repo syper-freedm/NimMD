@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "project": {
+    "components": [
+      {
+        "id": "nimmd",
+        "paths": [
+          "apps/**",
+          "crates/**",
+          "packages/**",
+          "scripts/**",
+          "tests/**"
+        ],
+        "checks": [
+          "desktop-build",
+          "project-tests",
+          "project-lint",
+          "core-bench-check"
+        ]
+      }
+    ],
+    "architecture": [
+      "README.md"
+    ],
+    "instructions": [
+      "AGENTS.md"
+    ],
+    "version_sources": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "rust-toolchain.toml",
+      "apps/desktop/package.json",
+      "apps/desktop/pnpm-lock.yaml",
+      "packages/vendor/package.json",
+      "packages/vendor/pnpm-lock.yaml",
+      "justfile",
+      ".github/workflows/ci.yml"
+    ]
+  },
+  "checks": [
+    {
+      "id": "desktop-build",
+      "category": "build",
+      "component": "nimmd",
+      "argv": [
+        "just",
+        "desktop-check"
+      ],
+      "cwd": ".",
+      "paths": [
+        "*"
+      ],
+      "conditions": "always",
+      "required": true,
+      "rules": [],
+      "version_sources": [],
+      "freshness_seconds": 3600,
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "project-tests",
+      "category": "test",
+      "component": "nimmd",
+      "argv": [
+        "just",
+        "test"
+      ],
+      "cwd": ".",
+      "paths": [
+        "*"
+      ],
+      "conditions": "always",
+      "required": true,
+      "rules": [],
+      "version_sources": [],
+      "freshness_seconds": 3600,
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "project-lint",
+      "category": "lint",
+      "component": "nimmd",
+      "argv": [
+        "just",
+        "lint"
+      ],
+      "cwd": ".",
+      "paths": [
+        "*"
+      ],
+      "conditions": "always",
+      "required": true,
+      "rules": [
+        ".semgrep.yml",
+        "deny.toml",
+        "clippy.toml"
+      ],
+      "version_sources": [],
+      "freshness_seconds": 3600,
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "core-bench-check",
+      "category": "test",
+      "component": "nimmd",
+      "argv": [
+        "just",
+        "bench-check"
+      ],
+      "cwd": ".",
+      "paths": [
+        "*"
+      ],
+      "conditions": "always",
+      "required": true,
+      "rules": [],
+      "version_sources": [],
+      "freshness_seconds": 3600,
+      "timeout_seconds": 900
+    }
+  ],
+  "workflow": {
+    "base_ref": "refs/heads/main",
+    "integration": "local-cas",
+    "max_rework": 2,
+    "max_environment_retries": 1,
+    "bindings": {
+      "issues": {
+        "name": "issues",
+        "required": true
+      },
+      "ux": {
+        "name": "ux-requirements-reviewer",
+        "required": true
+      },
+      "developer": {
+        "name": "ponytail:ponytail",
+        "required": false
+      },
+      "quality": {
+        "name": "ponytail:ponytail-review",
+        "required": false
+      }
+    }
+  }
+}

@@ -11,7 +11,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "NimMD", "width": 960, "height": 720, "minWidth": 400, "minHeight": 300 }],
+    "windows": [{ "label": "main", "create": false, "visible": false, "title": "NimMD", "width": 960, "height": 720, "minWidth": 400, "minHeight": 300 }],
     "security": {
       "csp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
       "devCsp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc: http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",

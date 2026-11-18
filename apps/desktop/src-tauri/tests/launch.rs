@@ -1,4 +1,4 @@
-use std::{ffi::OsString, io, os::unix::ffi::OsStringExt, path::Path};
+use std::{ffi::OsString, io, path::Path};
 
 use nimmd_desktop::app::launch::{Launch, Mode};
 
@@ -54,12 +54,15 @@ fn mode_and_path_reach_the_ipc_payload_and_window_title() {
         serde_json::to_value(&launch).unwrap(),
         serde_json::json!({"mode": "view", "path": "папка/file.md"})
     );
-    assert_eq!(launch.window_title(), "file.md — Просмотр");
-    assert_eq!(parse(&[]).unwrap().window_title(), "NimMD — Редактирование");
+    assert_eq!(launch.window_title(), "file.md");
+    assert_eq!(parse(&[]).unwrap().window_title(), "NimMD");
 }
 
+#[cfg(unix)]
 #[test]
 fn rejects_non_utf8_path() {
+    use std::os::unix::ffi::OsStringExt;
+
     assert_eq!(
         Launch::parse([OsString::from_vec(vec![0xff])])
             .unwrap_err()
