@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 48rem;
+  margin: 4rem auto;
+  padding: 0 2rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+.document-path {
+  overflow-wrap: anywhere;
+}

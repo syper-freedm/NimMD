@@ -1,0 +1,31 @@
+{
+  "config_version": 2,
+  "main_branch": "main",
+  "completion_action": "merge_into_main",
+  "workspace_mode": "shared_checkout",
+  "verification_commands": [
+    {
+      "description": "Сборка Rust workspace и всех целей",
+      "working_directory": ".",
+      "command": "cargo build --workspace --all-targets"
+    },
+    {
+      "description": "Тесты Rust и скриптов",
+      "working_directory": ".",
+      "command": "just test"
+    },
+    {
+      "description": "Все линтеры и проверки зависимостей",
+      "working_directory": ".",
+      "command": "just lint"
+    },
+    {
+      "description": "Порог производительности ядра",
+      "working_directory": ".",
+      "command": "just bench-check"
+    }
+  ],
+  "extra_review": "disabled",
+  "issue_tracker": "github",
+  "close_issues": "never"
+}

@@ -1,0 +1,6 @@
+ignoreScripts: true
+# pnpm задаёт возраст релиза в минутах: 7 суток.
+minimumReleaseAge: 10080
+overrides:
+  # GHSA-g3hv-75wg-m249: убрать после перехода ESLint/typescript-eslint на minimatch 11.
+  minimatch: 11.0.6

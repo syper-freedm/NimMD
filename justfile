@@ -1,6 +1,19 @@
-test:
+test: desktop-deps
     cargo test --workspace
     node --test "scripts/*.test.mjs"
+    pnpm -C apps/desktop test
+
+# Зависимости frontend закреплены в lockfile; install-скрипты отключены в pnpm-workspace.yaml.
+desktop-deps:
+    pnpm -C apps/desktop install --frozen-lockfile
+
+desktop-check: desktop-deps
+    cargo check -p nimmd-desktop
+    pnpm -C apps/desktop run build
+
+frontend-lint: desktop-deps
+    pnpm -C apps/desktop exec tsc --noEmit
+    pnpm -C apps/desktop run lint
 
 bench:
     cargo bench -p nimmd-core
@@ -14,7 +27,7 @@ snap:
     cargo insta test --accept -p nimmd-core
 
 # Все проверки кода: стиль, линтеры, инварианты проекта, зависимости, секреты, CI
-lint: fmt-check clippy doc semgrep deny vendor npm-licenses unused-deps secrets workflows
+lint: desktop-deps fmt-check clippy doc semgrep deny vendor npm-licenses unused-deps secrets workflows frontend-lint
 
 fmt-check:
     cargo fmt --all -- --check

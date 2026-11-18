@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NimMD",
+  "version": "0.1.0",
+  "identifier": "io.github.syper-freedm.nimmd",
+  "mainBinaryName": "nimmd",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{ "label": "main", "title": "NimMD", "width": 960, "height": 720, "minWidth": 400, "minHeight": 300 }],
+    "security": {
+      "csp": "default-src 'none'; img-src nimmd-asset: http://nimmd-asset.localhost data:; connect-src ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      "devCsp": "default-src 'none'; img-src nimmd-asset: http://nimmd-asset.localhost data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      "capabilities": ["main"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
+    "fileAssociations": [
+      { "ext": ["md", "markdown", "mdown", "mkd"], "name": "Markdown", "mimeType": "text/markdown", "role": "Editor" },
+      { "ext": ["toml"], "name": "TOML", "mimeType": "application/toml", "role": "Viewer" },
+      { "ext": ["yaml", "yml"], "name": "YAML", "mimeType": "application/yaml", "role": "Viewer" },
+      { "ext": ["json"], "name": "JSON", "mimeType": "application/json", "role": "Viewer" },
+      { "ext": ["csv"], "name": "CSV", "mimeType": "text/csv", "role": "Viewer" },
+      { "ext": ["txt"], "name": "Текст", "mimeType": "text/plain", "role": "Viewer" }
+    ]
+  }
+}
