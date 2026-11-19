@@ -38,6 +38,37 @@ enum WindowKey {
     File(PathBuf),
 }
 
+pub(super) struct PreparedLaunch {
+    key: WindowKey,
+    data: WindowLaunch,
+}
+
+impl PreparedLaunch {
+    pub(super) fn new(launch: Launch) -> io::Result<Self> {
+        let key = launch
+            .canonical_file()?
+            .map_or(WindowKey::Empty, WindowKey::File);
+        let view = match (launch.mode, launch.path.as_ref(), &key) {
+            (Mode::View, Some(path), WindowKey::File(canonical)) => {
+                Some(ViewFile::bind(path.clone(), canonical))
+            }
+            _ => None,
+        };
+        Ok(Self {
+            key,
+            data: WindowLaunch {
+                launch,
+                errors: Vec::new(),
+                view,
+            },
+        })
+    }
+
+    pub(super) fn has_file(&self) -> bool {
+        self.data.launch.path.is_some()
+    }
+}
+
 impl Registry {
     pub(super) fn lock(state: &Mutex<Self>) -> MutexGuard<'_, Self> {
         state.lock().unwrap_or_else(PoisonError::into_inner)
@@ -77,12 +108,12 @@ fn registry(app: &AppHandle) -> MutexGuard<'_, Registry> {
 }
 
 /// Оконные операции выполняются последовательно в главном потоке.
-pub(super) fn open(app: &AppHandle, launch: Launch) -> io::Result<()> {
-    let file = launch
-        .canonical_file()?
-        .map_or(WindowKey::Empty, WindowKey::File);
+pub(super) fn open(
+    app: &AppHandle,
+    PreparedLaunch { key, data }: PreparedLaunch,
+) -> io::Result<()> {
     let state = app.state::<Mutex<Registry>>();
-    let reused = reuse(state.inner(), &file, |label| {
+    let reused = reuse(state.inner(), &key, |label| {
         let Some(window) = app.get_webview_window(label) else {
             return Ok(false);
         };
@@ -90,7 +121,7 @@ pub(super) fn open(app: &AppHandle, launch: Launch) -> io::Result<()> {
             Ok(()) => Ok(true),
             // Окно может быть ещё в реестре Tauri после начала закрытия.
             Err(error) if window.is_visible().is_ok() => {
-                Err(window_error(&launch.window_title(), error))
+                Err(window_error(&data.launch.window_title(), error))
             }
             Err(_) => Ok(false),
         }
@@ -99,21 +130,7 @@ pub(super) fn open(app: &AppHandle, launch: Launch) -> io::Result<()> {
         return Ok(());
     }
 
-    let view = match (launch.mode, launch.path.as_ref(), &file) {
-        (Mode::View, Some(path), WindowKey::File(canonical)) => {
-            Some(ViewFile::bind(path.clone(), canonical))
-        }
-        _ => None,
-    };
-    create(
-        app,
-        Some(file),
-        WindowLaunch {
-            launch,
-            errors: Vec::new(),
-            view,
-        },
-    )
+    create(app, Some(key), data)
 }
 
 fn reuse(
@@ -223,7 +240,7 @@ pub(super) fn open_batch(
     source: Option<&str>,
     requests: impl Iterator<Item = io::Result<Launch>>,
 ) {
-    let errors = opening_errors(requests, |launch| open(app, launch));
+    let errors = opening_errors(requests, |launch| open(app, PreparedLaunch::new(launch)?));
     if let Some(label) = source
         && let Some(window) = app.get_webview_window(label)
     {
@@ -296,6 +313,34 @@ fn opening_errors(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_hands_off_the_view_file_before_waking_the_window_thread() {
+        use std::{fs, sync::mpsc, thread, time::Duration};
+
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("заметка.md");
+        fs::write(&path, "# Исходник").unwrap();
+        let (wake, awakened) = mpsc::channel();
+        let pending = super::super::prepare_startup(
+            Launch {
+                mode: Mode::View,
+                path: Some(path.clone()),
+            },
+            move || wake.send(thread::current().id()).unwrap(),
+        )
+        .unwrap();
+        let worker = awakened.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_ne!(worker, thread::current().id());
+        let PreparedLaunch { key, data } = pending.try_recv().unwrap().unwrap();
+        fs::rename(&path, folder.path().join("исходник.md")).unwrap();
+        fs::write(&path, "# Замена").unwrap();
+
+        let mut registry = Registry::default();
+        let label = registry.register(Some(key), data);
+        let error = registry.view_file(&label).unwrap().render().unwrap_err();
+        assert!(error.contains("по этому пути теперь находится другой файл"));
+    }
 
     #[test]
     fn launch_data_belongs_to_the_requesting_window() {

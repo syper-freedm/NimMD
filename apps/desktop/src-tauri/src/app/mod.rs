@@ -6,12 +6,21 @@ pub mod launch;
 mod view;
 mod windows;
 
-use std::{cell::Cell, rc::Rc, sync::Mutex};
+use std::{
+    cell::Cell,
+    io,
+    rc::Rc,
+    sync::{
+        Mutex,
+        mpsc::{self, Receiver, TryRecvError},
+    },
+    thread,
+};
 
 use tauri::{DragDropEvent, RunEvent, WebviewWindow, WindowEvent};
 
 use launch::Launch;
-use windows::{Registry, WindowLaunch};
+use windows::{PreparedLaunch, Registry, WindowLaunch};
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri извлекает окно и State для команды по значению.
@@ -39,6 +48,21 @@ async fn get_view(
         })?
 }
 
+fn prepare_startup(
+    launch: Launch,
+    wake: impl FnOnce() + Send + 'static,
+) -> io::Result<Receiver<io::Result<PreparedLaunch>>> {
+    let (prepared, pending) = mpsc::channel();
+    thread::Builder::new()
+        .name("nimmd-startup".into())
+        .spawn(move || {
+            if prepared.send(PreparedLaunch::new(launch)).is_ok() {
+                wake();
+            }
+        })?;
+    Ok(pending)
+}
+
 /// Запускает приложение или передаёт команду работающему экземпляру.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut launch = Launch::parse(std::env::args_os().skip(1))?;
@@ -57,23 +81,37 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     let mut cli = None;
 
-    let mut startup = Some((launch, Vec::new()));
+    let startup_app = app.handle().clone();
+    let pending = prepare_startup(launch, move || {
+        let _ = startup_app.run_on_main_thread(|| {});
+    })?;
+    let mut startup = Some((pending, Vec::new()));
     let mut ready = false;
     let startup_error = Rc::new(Cell::new(None));
     let error_out = Rc::clone(&startup_error);
     app.run_return(move |app, event| match event {
         RunEvent::Ready => ready = true,
         RunEvent::MainEventsCleared if ready => {
-            if let Some((launch, urls)) = startup.take() {
-                // Finder может передать первый документ до события Ready.
-                if (launch.path.is_some() || urls.is_empty())
-                    && let Err(error) = windows::open(app, launch)
-                {
+            if let Some((pending, urls)) = &startup {
+                let prepared = match pending.try_recv() {
+                    Ok(result) => result,
+                    Err(TryRecvError::Empty) => return,
+                    Err(error) => Err(io::Error::other(error)),
+                };
+                let result = prepared.and_then(|launch| {
+                    // Finder может передать первый документ до готовности запуска.
+                    if launch.has_file() || urls.is_empty() {
+                        windows::open(app, launch)?;
+                    }
+                    windows::open_batch(app, None, urls.iter().map(Launch::from_url));
+                    Ok(())
+                });
+                startup = None;
+                if let Err(error) = result {
                     error_out.set(Some(error));
                     app.exit(1);
                     return;
                 }
-                windows::open_batch(app, None, urls.iter().map(Launch::from_url));
                 #[cfg(target_os = "macos")]
                 if let Some(primary) = primary.take() {
                     // При ошибке первого открытия клиент не должен получить сигнал готовности.

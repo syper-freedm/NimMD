@@ -10,10 +10,10 @@ use crate::platform::{
     instance::{Activity, Primary},
 };
 
-use super::{launch::Launch, windows};
+use super::windows::{self, PreparedLaunch};
 
 pub(super) struct Requests {
-    incoming: Receiver<(Launch, Sender<io::Result<()>>)>,
+    incoming: Receiver<(PreparedLaunch, Sender<io::Result<()>>)>,
     activity: Activity,
     exit_deferred: bool,
 }
@@ -26,6 +26,7 @@ impl Requests {
         let idle = app.clone();
         primary.serve(
             move |launch| {
+                let launch = PreparedLaunch::new(launch)?;
                 let (reply, result) = mpsc::channel();
                 pending.send((launch, reply)).map_err(io::Error::other)?;
                 // Пробуждаем цикл: запрос будет обработан после старта оконного слоя.
