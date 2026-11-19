@@ -100,10 +100,7 @@ impl Launch {
         ))
     }
 
-    pub(super) fn canonical_file(&self) -> io::Result<Option<PathBuf>> {
-        let Some(path) = &self.path else {
-            return Ok(None);
-        };
+    pub(super) fn validate_file_path(path: &Path) -> io::Result<()> {
         check_display_path(path)?;
         if !path.is_absolute() {
             return Err(file_error(
@@ -112,6 +109,10 @@ impl Launch {
                 "Укажите абсолютный путь и откройте файл снова.",
             ));
         }
+        Ok(())
+    }
+
+    pub(super) fn canonical_file(path: &Path) -> io::Result<PathBuf> {
         let unavailable = |error: io::Error| {
             file_error(
                 path,
@@ -127,7 +128,7 @@ impl Launch {
                 "Выберите обычный файл и откройте его снова.",
             ));
         }
-        Ok(Some(canonical))
+        Ok(canonical)
     }
 
     pub fn window_title(&self) -> String {
@@ -182,7 +183,7 @@ mod tests {
     #[test]
     fn rejects_directory_with_a_retry_hint() {
         let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let error = Launch::from_path(directory).canonical_file().unwrap_err();
+        let error = Launch::canonical_file(&directory).unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
         assert!(error.to_string().contains("Выберите обычный файл"));
     }
@@ -198,11 +199,11 @@ mod tests {
         let alias = temp.join("<название>.toml");
         symlink(&file, &alias).unwrap();
         let launch = Launch::from_path(alias.clone());
-        let canonical = launch.canonical_file().unwrap();
+        let canonical = Launch::canonical_file(&alias).unwrap();
         fs::remove_file(&alias).unwrap();
         fs::remove_dir(&temp).unwrap();
 
-        assert_eq!(canonical, Some(file.canonicalize().unwrap()));
+        assert_eq!(canonical, file.canonicalize().unwrap());
         assert_eq!(launch.path.as_deref(), Some(alias.as_path()));
         assert_eq!(launch.window_title(), "<название>.toml");
     }
@@ -213,7 +214,7 @@ mod tests {
         use std::os::unix::ffi::OsStringExt;
 
         let path = std::env::temp_dir().join(OsString::from_vec(vec![0xff]));
-        let error = Launch::from_path(path).canonical_file().unwrap_err();
+        let error = Launch::validate_file_path(&path).unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
         assert!(error.to_string().contains("UTF-8"));
     }

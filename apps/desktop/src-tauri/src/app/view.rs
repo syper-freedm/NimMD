@@ -19,12 +19,38 @@ pub(super) struct ViewFile {
 }
 
 impl ViewFile {
-    pub(super) fn bind(path: PathBuf, canonical: &Path) -> Self {
-        // Открытый дескриптор удерживает исходный идентификатор даже после удаления файла.
-        let identity = open_regular(canonical)
-            .map(Arc::new)
-            .map_err(|error| read_error(&path, &error));
-        Self { path, identity }
+    pub(super) fn prepare(
+        path: &Path,
+        canonical_file: impl FnOnce() -> io::Result<PathBuf>,
+    ) -> io::Result<(Option<PathBuf>, Self)> {
+        // Дескриптор удерживает идентификатор выбранного файла даже после удаления.
+        let (key, identity) = match open_regular(path) {
+            Ok(original) => match canonical_file().and_then(|canonical| {
+                open_matching(&canonical, &original)?;
+                Ok(canonical)
+            }) {
+                Ok(canonical) => (Some(canonical), Ok(Arc::new(original))),
+                Err(error) => (None, Err(error)),
+            },
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => (None, Err(error)),
+            Err(error) => {
+                canonical_file()?;
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::NotFound | io::ErrorKind::InvalidInput
+                ) {
+                    return Err(io::Error::new(error.kind(), read_error(path, &error)));
+                }
+                (None, Err(error))
+            }
+        };
+        Ok((
+            key,
+            Self {
+                path: path.to_owned(),
+                identity: identity.map_err(|error| read_error(path, &error)),
+            },
+        ))
     }
 
     pub(super) fn render(&self) -> Result<String, String> {
@@ -34,12 +60,7 @@ impl ViewFile {
     }
 
     fn render_bound(&self, original: &Handle) -> io::Result<String> {
-        let current = open_regular(&self.path)?;
-        if &current != original {
-            return Err(io::Error::other(
-                "по этому пути теперь находится другой файл",
-            ));
-        }
+        let current = open_matching(&self.path, original)?;
 
         let file = current.as_file();
         let mut bytes = Vec::new();
@@ -73,6 +94,16 @@ impl ViewFile {
         };
         Ok(render(&source, &options).body)
     }
+}
+
+fn open_matching(path: &Path, original: &Handle) -> io::Result<Handle> {
+    let current = open_regular(path)?;
+    if &current != original {
+        return Err(io::Error::other(
+            "по этому пути теперь находится другой файл",
+        ));
+    }
+    Ok(current)
 }
 
 fn open_regular(path: &Path) -> io::Result<Handle> {
@@ -112,12 +143,18 @@ fn read_error(path: &Path, error: &io::Error) -> String {
 mod tests {
     use super::*;
 
+    fn bind(path: &Path) -> ViewFile {
+        let (key, view) = ViewFile::prepare(path, || path.canonicalize()).unwrap();
+        assert!(key.is_some());
+        view
+    }
+
     #[test]
     fn reports_lossy_text_from_the_bound_file() {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("данные.TXT");
         std::fs::write(&path, b"\xef\xbb\xbf<literal>\r\n\xff").unwrap();
-        let body = ViewFile::bind(path.clone(), &path).render().unwrap();
+        let body = bind(&path).render().unwrap();
         assert!(body.starts_with(r#"<main class="nimmd nimmd-data" data-kind="text">"#));
         assert!(body.contains(r#"class="banner not-utf8""#));
         assert!(body.contains("&lt;literal&gt;\n\u{FFFD}"));
@@ -129,19 +166,14 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("заметка.md");
         std::fs::write(&path, "# Исходник").unwrap();
-        let original = ViewFile::bind(path.clone(), &path);
+        let original = bind(&path);
         std::fs::remove_file(&path).unwrap();
         let missing = original.render().unwrap_err();
         assert!(missing.contains("«заметка.md»"));
         assert!(missing.contains("закройте окно и откройте его снова"));
         std::fs::write(&path, "# Другая заметка").unwrap();
         assert!(original.render().is_err());
-        assert!(
-            ViewFile::bind(path.clone(), &path)
-                .render()
-                .unwrap()
-                .contains("Другая заметка")
-        );
+        assert!(bind(&path).render().unwrap().contains("Другая заметка"));
     }
 
     #[cfg(unix)]
@@ -155,9 +187,12 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("недоступный.md");
         std::fs::write(&path, "# Исходник").unwrap();
-        let bound = ViewFile::bind(path.clone(), &path);
+        let bound = bind(&path);
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
         assert!(bound.render().unwrap_err().contains("«недоступный.md»"));
+        let (key, denied) = ViewFile::prepare(&path, || path.canonicalize()).unwrap();
+        assert!(key.is_none());
+        assert!(denied.render().unwrap_err().contains("«недоступный.md»"));
     }
 
     #[cfg(unix)]
@@ -170,7 +205,7 @@ mod tests {
         std::fs::write(&original, "# Исходник").unwrap();
         std::fs::write(&other, "# Замена").unwrap();
         std::os::unix::fs::symlink(&original, &alias).unwrap();
-        let bound = ViewFile::bind(alias.clone(), &original);
+        let bound = bind(&alias);
         assert!(bound.render().unwrap().contains("Исходник"));
         std::fs::remove_file(&alias).unwrap();
         std::os::unix::fs::symlink(&other, &alias).unwrap();
@@ -185,19 +220,49 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("file.txt");
         std::fs::write(&path, "Исходник").unwrap();
-        let bound = ViewFile::bind(path.clone(), &path);
-        std::fs::remove_file(&path).unwrap();
-        assert!(
-            std::process::Command::new("mkfifo")
-                .arg(&path)
-                .status()
-                .unwrap()
-                .success()
-        );
+        let bound = bind(&path);
         let (tx, rx) = mpsc::channel();
-        let worker = thread::spawn(move || tx.send(bound.render()).unwrap());
-        assert!(rx.recv_timeout(Duration::from_secs(2)).unwrap().is_err());
+        let worker = thread::spawn(move || {
+            let (key, preparing) = ViewFile::prepare(&path, || {
+                let canonical = path.canonicalize()?;
+                std::fs::rename(&path, folder.path().join("исходник.txt"))?;
+                assert!(
+                    std::process::Command::new("mkfifo")
+                        .arg(&path)
+                        .status()?
+                        .success()
+                );
+                Ok(canonical)
+            })
+            .unwrap();
+            assert!(key.is_none());
+            for view in [preparing, bound] {
+                let error = view.render().unwrap_err();
+                assert!(error.contains("«file.txt»"));
+                assert!(error.contains("нужен обычный файл"));
+            }
+            tx.send(()).unwrap();
+        });
+        rx.recv_timeout(Duration::from_secs(2)).unwrap();
         worker.join().unwrap();
+    }
+
+    #[test]
+    fn rejects_replacing_the_file_during_preparation() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("заметка.md");
+        std::fs::write(&path, "# Исходник").unwrap();
+        let (key, view) = ViewFile::prepare(&path, || {
+            let canonical = path.canonicalize()?;
+            std::fs::rename(&path, folder.path().join("исходник.md"))?;
+            std::fs::write(&path, "# Замена")?;
+            Ok(canonical)
+        })
+        .unwrap();
+        let error = view.render().unwrap_err();
+        assert!(error.contains("«заметка.md»"));
+        assert!(error.contains("по этому пути теперь находится другой файл"));
+        assert!(key.is_none());
     }
 
     #[test]
@@ -212,7 +277,7 @@ mod tests {
         assert_eq!(input.len(), MAX_READ - 2);
         input.extend_from_slice(&[0xe2, 0x82]);
         std::fs::write(&path, &input).unwrap();
-        let bound = ViewFile::bind(path.clone(), &path);
+        let bound = bind(&path);
         let exact = bound.render().unwrap();
         assert!(exact.contains(r#"class="banner not-utf8""#));
         assert!(exact.contains(r#"class="banner truncated""#));

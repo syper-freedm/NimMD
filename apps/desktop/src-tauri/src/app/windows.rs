@@ -39,20 +39,22 @@ enum WindowKey {
 }
 
 pub(super) struct PreparedLaunch {
-    key: WindowKey,
+    key: Option<WindowKey>,
     data: WindowLaunch,
 }
 
 impl PreparedLaunch {
     pub(super) fn new(launch: Launch) -> io::Result<Self> {
-        let key = launch
-            .canonical_file()?
-            .map_or(WindowKey::Empty, WindowKey::File);
-        let view = match (launch.mode, launch.path.as_ref(), &key) {
-            (Mode::View, Some(path), WindowKey::File(canonical)) => {
-                Some(ViewFile::bind(path.clone(), canonical))
+        let (key, view) = if let Some(path) = &launch.path {
+            Launch::validate_file_path(path)?;
+            if launch.mode == Mode::View {
+                let (canonical, view) = ViewFile::prepare(path, || Launch::canonical_file(path))?;
+                (canonical.map(WindowKey::File), Some(view))
+            } else {
+                (Some(WindowKey::File(Launch::canonical_file(path)?)), None)
             }
-            _ => None,
+        } else {
+            (Some(WindowKey::Empty), None)
         };
         Ok(Self {
             key,
@@ -113,24 +115,25 @@ pub(super) fn open(
     PreparedLaunch { key, data }: PreparedLaunch,
 ) -> io::Result<()> {
     let state = app.state::<Mutex<Registry>>();
-    let reused = reuse(state.inner(), &key, |label| {
-        let Some(window) = app.get_webview_window(label) else {
-            return Ok(false);
-        };
-        match activate(&window) {
-            Ok(()) => Ok(true),
-            // Окно может быть ещё в реестре Tauri после начала закрытия.
-            Err(error) if window.is_visible().is_ok() => {
-                Err(window_error(&data.launch.window_title(), error))
+    if let Some(key) = &key
+        && reuse(state.inner(), key, |label| {
+            let Some(window) = app.get_webview_window(label) else {
+                return Ok(false);
+            };
+            match activate(&window) {
+                Ok(()) => Ok(true),
+                // Окно может быть ещё в реестре Tauri после начала закрытия.
+                Err(error) if window.is_visible().is_ok() => {
+                    Err(window_error(&data.launch.window_title(), error))
+                }
+                Err(_) => Ok(false),
             }
-            Err(_) => Ok(false),
-        }
-    })?;
-    if reused {
+        })?
+    {
         return Ok(());
     }
 
-    create(app, Some(key), data)
+    create(app, key, data)
 }
 
 fn reuse(
@@ -337,7 +340,7 @@ mod tests {
         fs::write(&path, "# Замена").unwrap();
 
         let mut registry = Registry::default();
-        let label = registry.register(Some(key), data);
+        let label = registry.register(key, data);
         let error = registry.view_file(&label).unwrap().render().unwrap_err();
         assert!(error.contains("по этому пути теперь находится другой файл"));
     }
@@ -381,18 +384,12 @@ mod tests {
         let mut register = |name: &str, content, mode| {
             let path = folder.path().join(name);
             std::fs::write(&path, content).unwrap();
-            let view = Some(ViewFile::bind(path.clone(), &path));
-            registry.register(
-                Some(WindowKey::File(path.clone())),
-                WindowLaunch {
-                    launch: Launch {
-                        mode,
-                        path: Some(path),
-                    },
-                    errors: Vec::new(),
-                    view,
-                },
-            )
+            let PreparedLaunch { key, data } = PreparedLaunch::new(Launch {
+                mode,
+                path: Some(path),
+            })
+            .unwrap();
+            registry.register(key, data)
         };
         let first = register("1.md", "Первый документ", Mode::View);
         let second = register("2.md", "Второй документ", Mode::View);
@@ -415,6 +412,24 @@ mod tests {
         assert!(registry.view_file(&editor).is_none());
         assert!(registry.view_file(&empty).is_none());
         assert!(registry.view_file("unknown-window").is_none());
+    }
+
+    #[test]
+    fn view_launch_rejects_missing_file_and_directory() {
+        let folder = tempfile::tempdir().unwrap();
+        for (path, expected) in [
+            (folder.path().join("нет.md"), io::ErrorKind::NotFound),
+            (folder.path().to_owned(), io::ErrorKind::InvalidInput),
+        ] {
+            let error = PreparedLaunch::new(Launch {
+                mode: Mode::View,
+                path: Some(path),
+            })
+            .err()
+            .unwrap();
+            assert_eq!(error.kind(), expected);
+            assert!(error.to_string().contains("Не удалось открыть"));
+        }
     }
 
     #[test]
@@ -483,7 +498,7 @@ mod tests {
         ];
         let mut opened = Vec::new();
         let errors = opening_errors(urls.iter().map(Launch::from_url), |launch| {
-            launch.canonical_file()?;
+            PreparedLaunch::new(launch.clone())?;
             opened.push(launch);
             Ok(())
         });
