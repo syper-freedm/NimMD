@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru" data-theme="auto">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NimMD</title>
+    <style>
+      #launch-notice {
+        position: fixed;
+        inset: 0 0 auto;
+        z-index: 1;
+        max-width: 46rem;
+        margin: 0 auto;
+        background: var(--bg-subtle);
+        overflow-wrap: anywhere;
+      }
+    </style>
+    <script type="module" src="/src/view.ts"></script>
+  </head>
+  <body>
+    <div id="app">
+      <p class="nimmd" role="status">Загрузка документа…</p>
+    </div>
+  </body>
+</html>

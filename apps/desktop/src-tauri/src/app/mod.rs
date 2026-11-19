@@ -3,6 +3,7 @@
 #[cfg(target_os = "macos")]
 mod cli;
 pub mod launch;
+mod view;
 mod windows;
 
 use std::{cell::Cell, rc::Rc, sync::Mutex};
@@ -23,6 +24,21 @@ fn get_launch(
         .ok_or_else(|| "Параметры окна недоступны".into())
 }
 
+#[tauri::command]
+async fn get_view(
+    window: WebviewWindow,
+    state: tauri::State<'_, Mutex<Registry>>,
+) -> Result<String, String> {
+    let file = Registry::lock(state.inner())
+        .view_file(window.label())
+        .ok_or_else(|| "У этого окна нет файла для просмотра.".to_owned())?;
+    tauri::async_runtime::spawn_blocking(move || file.render())
+        .await
+        .map_err(|_| {
+            "Не удалось подготовить просмотр. Закройте окно и откройте файл снова.".to_owned()
+        })?
+}
+
 /// Запускает приложение или передаёт команду работающему экземпляру.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut launch = Launch::parse(std::env::args_os().skip(1))?;
@@ -34,7 +50,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = tauri::Builder::default()
         .manage(Mutex::new(Registry::default()))
-        .invoke_handler(tauri::generate_handler![get_launch])
+        .invoke_handler(tauri::generate_handler![get_launch, get_view])
         .build(tauri::generate_context!())?;
     #[cfg(target_os = "macos")]
     let mut primary = Some(primary);
@@ -50,12 +66,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         RunEvent::MainEventsCleared if ready => {
             if let Some((launch, urls)) = startup.take() {
                 // Finder может передать первый документ до события Ready.
-                if launch.path.is_some() || urls.is_empty() {
-                    if let Err(error) = windows::open(app, launch) {
-                        error_out.set(Some(error));
-                        app.exit(1);
-                        return;
-                    }
+                if (launch.path.is_some() || urls.is_empty())
+                    && let Err(error) = windows::open(app, launch)
+                {
+                    error_out.set(Some(error));
+                    app.exit(1);
+                    return;
                 }
                 windows::open_batch(app, None, urls.iter().map(Launch::from_url));
                 #[cfg(target_os = "macos")]

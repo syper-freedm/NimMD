@@ -6,15 +6,23 @@ use std::{
 };
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    webview::NewWindowResponse,
+};
 
-use super::launch::Launch;
+use super::{
+    launch::{Launch, Mode},
+    view::ViewFile,
+};
 
 #[derive(Clone, Serialize)]
 pub(super) struct WindowLaunch {
     #[serde(flatten)]
     launch: Launch,
     errors: Vec<String>,
+    #[serde(skip)]
+    view: Option<ViewFile>,
 }
 
 #[derive(Default)]
@@ -37,6 +45,15 @@ impl Registry {
 
     pub(super) fn launch(&self, label: &str) -> Option<WindowLaunch> {
         self.by_label.get(label).cloned()
+    }
+
+    pub(super) fn view_file(&self, label: &str) -> Option<ViewFile> {
+        let data = self.by_label.get(label)?;
+        if data.launch.mode == Mode::View {
+            data.view.clone()
+        } else {
+            None
+        }
     }
 
     fn register(&mut self, file: Option<WindowKey>, data: WindowLaunch) -> String {
@@ -82,12 +99,19 @@ pub(super) fn open(app: &AppHandle, launch: Launch) -> io::Result<()> {
         return Ok(());
     }
 
+    let view = match (launch.mode, launch.path.as_ref(), &file) {
+        (Mode::View, Some(path), WindowKey::File(canonical)) => {
+            Some(ViewFile::bind(path.clone(), canonical))
+        }
+        _ => None,
+    };
     create(
         app,
         Some(file),
         WindowLaunch {
             launch,
             errors: Vec::new(),
+            view,
         },
     )
 }
@@ -117,10 +141,26 @@ fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::R
         .cloned()
         .ok_or_else(|| window_error(&title, "В конфигурации отсутствуют параметры окна."))?;
     config.title.clone_from(&title);
+    let view_url = if data.launch.mode == Mode::View {
+        const VIEW_PAGE: &str = "view.html";
+        config.url = WebviewUrl::App(VIEW_PAGE.into());
+        Some(
+            view_url(app, config.use_https_scheme, VIEW_PAGE)
+                .map_err(|error| window_error(&title, error))?,
+        )
+    } else {
+        None
+    };
     config.label = registry(app).register(file, data);
 
     let result = (|| {
-        let window = WebviewWindowBuilder::from_config(app, &config)?.build()?;
+        let mut builder = WebviewWindowBuilder::from_config(app, &config)?;
+        if let Some(view_url) = view_url {
+            builder = builder
+                .on_navigation(move |url| same_page(url, &view_url))
+                .on_new_window(|_, _| NewWindowResponse::Deny);
+        }
+        let window = builder.build()?;
         if let Err(error) = activate(&window) {
             let _ = window.destroy();
             return Err(error);
@@ -132,6 +172,33 @@ fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::R
         return Err(window_error(&title, error));
     }
     Ok(())
+}
+
+fn view_url(app: &AppHandle, https: bool, page: &str) -> io::Result<Url> {
+    if tauri::is_dev()
+        && let Some(dev_url) = &app.config().build.dev_url
+    {
+        return dev_url.join(page).map_err(io::Error::other);
+    }
+    // Tauri использует HTTP-адрес для внутреннего протокола на Windows и Android.
+    let base = if cfg!(any(windows, target_os = "android")) {
+        if https {
+            "https://tauri.localhost/"
+        } else {
+            "http://tauri.localhost/"
+        }
+    } else {
+        "tauri://localhost/"
+    };
+    Url::parse(base)
+        .and_then(|base| base.join(page))
+        .map_err(io::Error::other)
+}
+
+fn same_page(url: &Url, page: &Url) -> bool {
+    let mut url = url.clone();
+    url.set_fragment(None);
+    &url == page
 }
 
 fn activate(window: &WebviewWindow) -> tauri::Result<()> {
@@ -157,14 +224,14 @@ pub(super) fn open_batch(
     requests: impl Iterator<Item = io::Result<Launch>>,
 ) {
     let errors = opening_errors(requests, |launch| open(app, launch));
-    if let Some(label) = source {
-        if let Some(window) = app.get_webview_window(label) {
-            store_errors(&window, &errors);
-            if !errors.is_empty() {
-                let _ = activate(&window);
-            }
-            return;
+    if let Some(label) = source
+        && let Some(window) = app.get_webview_window(label)
+    {
+        store_errors(&window, &errors);
+        if !errors.is_empty() {
+            let _ = activate(&window);
         }
+        return;
     }
     if errors.is_empty() {
         return;
@@ -188,6 +255,7 @@ pub(super) fn open_batch(
         WindowLaunch {
             launch: Launch::default(),
             errors: errors.clone(),
+            view: None,
         },
     ) {
         eprintln!("{}\n{error}", errors.join("\n"));
@@ -228,7 +296,6 @@ fn opening_errors(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::launch::Mode;
 
     #[test]
     fn launch_data_belongs_to_the_requesting_window() {
@@ -241,6 +308,7 @@ mod tests {
                     path: Some(PathBuf::from("/a/<note>.md")),
                 },
                 errors: vec!["Выберите файл.".into()],
+                view: None,
             },
         );
         let second = registry.register(
@@ -248,6 +316,7 @@ mod tests {
             WindowLaunch {
                 launch: Launch::from_path(PathBuf::from("/b/note.md")),
                 errors: Vec::new(),
+                view: None,
             },
         );
         assert_eq!(
@@ -261,6 +330,63 @@ mod tests {
     }
 
     #[test]
+    fn view_file_belongs_only_to_the_requesting_viewer() {
+        let folder = tempfile::tempdir().unwrap();
+        let mut registry = Registry::default();
+        let mut register = |name: &str, content, mode| {
+            let path = folder.path().join(name);
+            std::fs::write(&path, content).unwrap();
+            let view = Some(ViewFile::bind(path.clone(), &path));
+            registry.register(
+                Some(WindowKey::File(path.clone())),
+                WindowLaunch {
+                    launch: Launch {
+                        mode,
+                        path: Some(path),
+                    },
+                    errors: Vec::new(),
+                    view,
+                },
+            )
+        };
+        let first = register("1.md", "Первый документ", Mode::View);
+        let second = register("2.md", "Второй документ", Mode::View);
+        let editor = register("3.md", "Документ в редакторе", Mode::Edit);
+        let empty = registry.register(
+            Some(WindowKey::Empty),
+            WindowLaunch {
+                launch: Launch::default(),
+                errors: Vec::new(),
+                view: None,
+            },
+        );
+        let first_body = registry.view_file(&first).unwrap().render().unwrap();
+        let second_body = registry.view_file(&second).unwrap().render().unwrap();
+        assert!(first_body.starts_with(r#"<main class="nimmd">"#));
+        assert!(first_body.contains("Первый документ"));
+        assert!(!first_body.contains("Второй документ"));
+        assert!(second_body.contains("Второй документ"));
+        assert!(!second_body.contains("Первый документ"));
+        assert!(registry.view_file(&editor).is_none());
+        assert!(registry.view_file(&empty).is_none());
+        assert!(registry.view_file("unknown-window").is_none());
+    }
+
+    #[test]
+    fn viewer_navigation_allows_only_its_page_and_anchors() {
+        let page = Url::parse("tauri://localhost/view.html").unwrap();
+        assert!(same_page(&page, &page));
+        assert!(same_page(&page.join("#fn-1").unwrap(), &page));
+        for url in [
+            "tauri://localhost/index.html",
+            "tauri://localhost/view.html?file=note.md",
+            "https://example.com/",
+        ] {
+            assert!(!same_page(&Url::parse(url).unwrap(), &page));
+        }
+    }
+
+    #[test]
     fn closing_between_lookup_and_activation_allows_reopen() {
         let state = Mutex::new(Registry::default());
         let file = || WindowKey::File(PathBuf::from("/note.md"));
@@ -269,6 +395,7 @@ mod tests {
             WindowLaunch {
                 launch: Launch::from_path(PathBuf::from("/note.md")),
                 errors: Vec::new(),
+                view: None,
             },
         );
         assert!(
@@ -286,6 +413,7 @@ mod tests {
                     path: Some(PathBuf::from("/note.md")),
                 },
                 errors: Vec::new(),
+                view: None,
             },
         );
         Registry::lock(&state).remove(&first); // Запоздавшее событие Destroyed.

@@ -85,10 +85,9 @@ impl Launch {
             && url.host_str().is_none_or(|host| host == "localhost")
             && url.query().is_none()
             && url.fragment().is_none()
+            && let Ok(path) = url.to_file_path()
         {
-            if let Ok(path) = url.to_file_path() {
-                return Ok(Self::from_path(path));
-            }
+            return Ok(Self::from_path(path));
         }
         let name = url
             .path_segments()

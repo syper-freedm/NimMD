@@ -1,0 +1,229 @@
+import { invoke } from "@tauri-apps/api/core";
+import type { Launch } from "./launch";
+import "../../../packages/theme/nimmd.css";
+import "../../../packages/theme/highlight.css";
+import "../../../packages/theme/data.css";
+
+type Block = { node: HTMLElement; source: string };
+
+interface ViewLibraries extends Window {
+  katex?: {
+    render: (source: string, node: HTMLElement, options: {
+      displayMode: boolean; trust: false; throwOnError: false; errorColor: string;
+    }) => void;
+  };
+  mermaid?: {
+    initialize: (options: {
+      securityLevel: "strict"; startOnLoad: false; layout: "dagre";
+      theme: "default" | "dark"; suppressErrorRendering: true; deterministicIds: true;
+    }) => void;
+    parse: (source: string) => Promise<{ config: Record<string, unknown> }>;
+    run: (options: { nodes: HTMLElement[]; suppressErrors: true }) => Promise<void>;
+  };
+}
+
+const libraries: ViewLibraries = window;
+const viewError = "Не удалось показать документ. Закройте окно и откройте файл снова.";
+const mathErrorColor = "var(--nimmd-katex-error)";
+
+function showBlockMessage(node: HTMLElement, message: string): void {
+  const notice = document.createElement("span");
+  notice.setAttribute("role", "status");
+  notice.textContent = ` ${message}`;
+  node.after(notice);
+}
+
+function loadAsset(asset: HTMLLinkElement | HTMLScriptElement): Promise<void> {
+  return new Promise((resolve, reject) => {
+    asset.addEventListener("load", () => { resolve(); }, { once: true });
+    asset.addEventListener("error", () => {
+      asset.remove();
+      reject(new Error("Ресурс недоступен"));
+    }, { once: true });
+    document.head.append(asset);
+  });
+}
+
+async function renderMath(blocks: Block[]): Promise<void> {
+  if (!blocks.length) return;
+  const css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "/vendor/katex.min.css";
+  const script = document.createElement("script");
+  script.src = "/vendor/katex.min.js";
+  try {
+    await Promise.all([loadAsset(css), loadAsset(script)]);
+    if (!libraries.katex) throw new Error("KaTeX недоступен");
+  } catch {
+    for (const { node } of blocks) showBlockMessage(node, "Не удалось отрисовать формулу. Ресурс недоступен.");
+    return;
+  }
+
+  for (const { node, source } of blocks) {
+    const output = document.createElement("span");
+    try {
+      libraries.katex.render(source, output, {
+        displayMode: node.dataset.mathStyle === "display",
+        trust: false,
+        throwOnError: false,
+        errorColor: mathErrorColor,
+      });
+      // KaTeX с throwOnError: false помечает неизвестные команды цветом в MathML.
+      if (output.querySelector(`.katex-error, [mathcolor="${mathErrorColor}"]`)) {
+        throw new Error("Ошибка TeX");
+      }
+      node.replaceChildren(...output.childNodes);
+    } catch {
+      showBlockMessage(node, "Не удалось отрисовать формулу.");
+    }
+  }
+}
+
+function dagreOverrides(config: Record<string, unknown>): Record<string, "dagre" | { layout: "dagre" }> {
+  const overrides: [string, "dagre" | { layout: "dagre" }][] = [];
+  for (const [key, value] of Object.entries(config)) {
+    if (key === "layout" && typeof value === "string" && value.startsWith("elk")) {
+      overrides.push([key, "dagre"]);
+    } else if (value && typeof value === "object" && "layout" in value &&
+      typeof value.layout === "string" && value.layout.startsWith("elk")) {
+      overrides.push([key, { layout: "dagre" }]);
+    }
+  }
+  return Object.fromEntries(overrides);
+}
+
+async function renderDiagrams(blocks: Block[]): Promise<void> {
+  if (!blocks.length) return;
+  // Самозапуск Mermaid привязан к load. Подключаем скрипт после события.
+  if (document.readyState !== "complete") {
+    await new Promise<void>((resolve) => {
+      window.addEventListener("load", () => { resolve(); }, { once: true });
+    });
+  }
+
+  const script = document.createElement("script");
+  script.src = "/vendor/mermaid.min.js";
+  let mermaid;
+  try {
+    await loadAsset(script);
+    mermaid = libraries.mermaid;
+    if (!mermaid) throw new Error("Mermaid недоступен");
+    mermaid.initialize({
+      securityLevel: "strict",
+      startOnLoad: false,
+      layout: "dagre",
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+      suppressErrorRendering: true,
+      deterministicIds: true,
+    });
+  } catch {
+    for (const { node } of blocks) showBlockMessage(node, "Не удалось отрисовать диаграмму. Ресурс недоступен.");
+    return;
+  }
+
+  const prepared: Block[] = [];
+  for (const block of blocks) {
+    try {
+      const { config } = await mermaid.parse(block.source);
+      const overrides = dagreOverrides(config);
+      if (Object.keys(overrides).length) {
+        // Последняя директива перекрывает layout из frontmatter или init и сохраняет текст подписей.
+        block.node.textContent = `${block.source}\n%%{init: ${JSON.stringify(overrides)}}%%`;
+      }
+      prepared.push(block);
+    } catch {
+      showBlockMessage(block.node, "Не удалось отрисовать диаграмму.");
+    }
+  }
+
+  if (!prepared.length) return;
+  try {
+    await mermaid.run({ nodes: prepared.map(({ node }) => node), suppressErrors: true });
+  } catch {
+    // Результат и исходник проверяются для каждого блока отдельно.
+  }
+  for (const { node, source } of prepared) {
+    if (node.querySelector(":scope > svg")) continue;
+    node.textContent = source;
+    node.removeAttribute("data-processed");
+    showBlockMessage(node, "Не удалось отрисовать диаграмму.");
+  }
+}
+
+async function renderBlocks(main: HTMLElement): Promise<void> {
+  const math: Block[] = [];
+  const diagrams: Block[] = [];
+  let total = 0;
+  for (const node of main.querySelectorAll<HTMLElement>("[data-math-style], pre.mermaid")) {
+    const source = node.textContent;
+    const formula = node.hasAttribute("data-math-style");
+    if (source.length > (formula ? 4096 : 8192)) {
+      showBlockMessage(node, formula ? "Формула слишком длинная." : "Диаграмма слишком длинная.");
+      continue;
+    }
+    if (math.length + diagrams.length >= 32 || total + source.length > 32_768) {
+      showBlockMessage(node, "Превышен лимит документа для формул и диаграмм.");
+      continue;
+    }
+    (formula ? math : diagrams).push({ node, source });
+    total += source.length;
+  }
+  await Promise.all([renderMath(math), renderDiagrams(diagrams)]);
+}
+
+function watchWindowErrors(root: HTMLElement, notice: HTMLElement): Promise<void> {
+  let generation = 0;
+  async function refresh(): Promise<void> {
+    const request = ++generation;
+    let errors: string[];
+    try {
+      const launch = await invoke<Launch>("get_launch");
+      errors = launch.errors;
+    } catch {
+      errors = ["Не удалось получить параметры запуска. Перезапустите NimMD."];
+    }
+    if (request !== generation) return;
+
+    const list = document.createElement("ul");
+    list.setAttribute("role", "alert");
+    for (const error of errors) {
+      const item = document.createElement("li");
+      item.textContent = error;
+      list.append(item);
+    }
+    notice.replaceChildren(...(errors.length ? [list] : []));
+  }
+  root.addEventListener("nimmd-launch-changed", () => { void refresh(); });
+  return refresh();
+}
+
+export async function showView(root: HTMLElement): Promise<void> {
+  const notice = document.createElement("div");
+  notice.id = "launch-notice";
+  const status = document.createElement("p");
+  status.className = "nimmd";
+  status.setAttribute("role", "status");
+  status.textContent = "Загрузка документа…";
+  root.replaceChildren(notice, status);
+  const launchReady = watchWindowErrors(root, notice);
+
+  let main;
+  try {
+    const body = await invoke<string>("get_view");
+    const parsed = new DOMParser().parseFromString(body, "text/html");
+    const content = parsed.body.querySelector<HTMLElement>("main.nimmd");
+    if (!content) throw new Error(viewError);
+    main = document.importNode(content, true);
+  } catch (error) {
+    status.setAttribute("role", "alert");
+    status.textContent = typeof error === "string" ? error : error instanceof Error ? error.message : viewError;
+    await launchReady;
+    return;
+  }
+
+  status.replaceWith(main);
+  await Promise.all([launchReady, renderBlocks(main)]);
+}
+
+const root = document.getElementById("app");
+if (root) void showView(root);

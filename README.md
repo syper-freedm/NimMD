@@ -8,7 +8,7 @@
 
 - `crates/nimmd-core` — ядро: Markdown и файлы данных в HTML ([README](crates/nimmd-core/README.md)).
 - `crates/nimmd-assets` — безопасное чтение картинок, на которые ссылается документ.
-- `apps/desktop` — каркас Tauri 2: окно, режим запуска и путь из командной строки.
+- `apps/desktop` — приложение Tauri 2 с режимом просмотра и каркасом редактора.
 - `packages/theme` — CSS тем и подсветки, скрипты инициализации KaTeX и Mermaid.
 - `packages/vendor` — сборка KaTeX и Mermaid без сети в рантайме.
 
@@ -24,10 +24,10 @@ just desktop-check # cargo check приложения и сборка frontend
 
 ## Приложение
 
-Нужны stable Rust, Node.js 26, pnpm 12.18.0 и
+Для приложения нужны Rust 1.90 или новее, Node.js 26, pnpm 12.18.0 и
 [инструменты сборки Tauri для macOS](https://v2.tauri.app/start/prerequisites/#macos).
-Tauri закреплён на 2.11.6 / tauri-build 2.6.3: следующие minor-версии требуют
-Rust 1.90 при MSRV проекта 1.85. TypeScript 6.0.3 совместим с текущим typescript-eslint;
+Закреплены Tauri 2.12.7 и tauri-build 2.7.6. Для workspace, ядра и nimmd-assets
+сохранён объявленный MSRV 1.85. TypeScript 6.0.3 совместим с текущим typescript-eslint;
 TypeScript 7 пока не поддерживается его проверками типов.
 
 ```sh
@@ -49,9 +49,15 @@ pnpm -C apps/desktop tauri build --debug --no-bundle
 Если CLI не дождался ответа после отправки запроса, открытие ещё может завершиться.
 Проверьте окна NimMD перед повтором команды.
 
-В окне отображаются режим и путь. Чтение, редактор, рендер и сохранение файлов
-добавляются в следующих задачах. Код в `app/` запрещает unsafe. WebView получает
-параметры и ошибки своего окна по команде `get_launch`.
+Режим просмотра форматирует Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`), TOML,
+YAML (`.yaml`, `.yml`), JSON и CSV и показывает `.txt` как обычный текст. Неизвестное
+расширение обрабатывается как Markdown. Файлы без флага `--view`, из Finder или
+перетаскивания открываются в каркасе редактора, который показывает режим и путь.
+
+Просмотрщик обращается за ресурсами формул и диаграмм к `/vendor`. До задачи #54
+штатная сборка показывает исходный TeX и Mermaid с сообщением о недоступности
+отрисовки. В режиме разработки рендереры доступны, если подать ресурсы `just vendor`
+по этому пути с того же origin.
 
 Конфиг Tauri собирает `NimMD.app` для macOS 14 и новее. `bundle.fileAssociations` генерирует
 `CFBundleDocumentTypes`: Markdown — `Editor`, TOML/YAML/JSON/CSV/текст — `Viewer`.

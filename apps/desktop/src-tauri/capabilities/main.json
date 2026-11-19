@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Каждое окно NimMD может получить только собственные параметры запуска.",
+  "description": "Каждое окно NimMD может получить только собственные параметры запуска и содержимое привязанного файла в режиме просмотра.",
   "windows": ["nimmd-window-*"],
-  "permissions": ["allow-get-launch"]
+  "permissions": ["allow-get-launch", "allow-get-view"]
 }
