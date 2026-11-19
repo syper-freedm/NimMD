@@ -170,6 +170,110 @@ test("лимиты UTF-16 считаются совместно и пропус�
   expect(root.textContent).toContain("лимит документа");
 });
 
+const elkDiagram = '---\nconfig:\n  layout: elk\n---\nflowchart TD\nA["layout: elk"]';
+const dagreDirective = '\n%%{init: {"layout":"dagre"}}%%';
+
+function captureDiagrams(): { inputs: string[]; parsed: string[] } {
+  const inputs: string[] = [];
+  const parsed: string[] = [];
+  vi.stubGlobal("mermaid", {
+    initialize: vi.fn(),
+    parse: (text: string) => {
+      parsed.push(text);
+      return Promise.resolve({ config: text.startsWith(elkDiagram) ? { layout: "elk" } : {} });
+    },
+    run: ({ nodes }: { nodes: HTMLElement[] }) => {
+      for (const node of nodes) {
+        inputs.push(node.textContent);
+        node.replaceChildren(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+      }
+      return Promise.resolve();
+    },
+  });
+  return { inputs, parsed };
+}
+
+test("запись настройки dagre входит в предел длины диаграммы", async () => {
+  const prefix = elkDiagram + "\n%% ";
+  const max = prefix + "x".repeat(8192 - prefix.length - dagreDirective.length);
+  const over = max + "x";
+  mockView(`<pre class="mermaid">${over}</pre><pre class="mermaid">${max}</pre>`);
+  const { inputs } = captureDiagrams();
+
+  const ready = showView(root);
+  await loadAsset("/vendor/mermaid.min.js");
+  await ready;
+
+  expect(inputs.map((input) => input.length)).toEqual([8192]);
+  expect(inputs[0]).toBe(max + dagreDirective);
+  expect(root.querySelector("pre.mermaid")?.textContent).toBe(over);
+  expect(root.querySelector("pre.mermaid + [role=status]")?.textContent).toContain("Диаграмма слишком длинная");
+  expect(root.querySelectorAll("pre.mermaid > svg")).toHaveLength(1);
+});
+
+test.each([0, 1])("общий предел учитывает dagre в порядке документа при добавке %i", async (extra) => {
+  const math = (s: string) => `<span data-math-style="inline">${s}</span>`;
+  const maxMath = "x".repeat(4096);
+  const tail = "x".repeat(4096 - elkDiagram.length - dagreDirective.length + extra);
+  mockView(
+    math(maxMath).repeat(7) + math(tail) + `<pre class="mermaid">${elkDiagram}</pre>` + math("y"),
+  );
+  const { inputs, parsed } = captureDiagrams();
+  const renderedMath: string[] = [];
+  vi.stubGlobal("katex", {
+    render: (source: string, node: HTMLElement) => {
+      renderedMath.push(source);
+      const output = document.createElement("span");
+      output.className = "katex";
+      node.append(output);
+    },
+  });
+
+  const ready = showView(root);
+  await Promise.all([
+    loadAsset("/vendor/katex.min.js"),
+    loadAsset("/vendor/katex.min.css"),
+    loadAsset("/vendor/mermaid.min.js"),
+  ]);
+  await ready;
+
+  const diagram = root.querySelector("pre.mermaid");
+  const lastFormula = root.querySelectorAll("[data-math-style]")[8];
+  expect(parsed).toEqual([elkDiagram]);
+  if (extra) {
+    expect(inputs).toEqual([]);
+    expect(diagram?.textContent).toBe(elkDiagram);
+    expect(diagram?.nextElementSibling?.textContent).toContain("лимит документа");
+    expect(renderedMath.at(-1)).toBe("y");
+    expect(lastFormula?.querySelector(".katex")).not.toBeNull();
+  } else {
+    expect(inputs).toEqual([elkDiagram + dagreDirective]);
+    expect(diagram?.querySelector("svg")).not.toBeNull();
+    expect(lastFormula?.textContent).toBe("y");
+    expect(lastFormula?.nextElementSibling?.textContent).toContain("лимит документа");
+    expect(renderedMath).toHaveLength(8);
+  }
+});
+
+test("подготовка отклонённых диаграмм ограничена отдельно от рендера", async () => {
+  const prefix = elkDiagram + "\n%% ";
+  const over = prefix + "x".repeat(8193 - prefix.length - dagreDirective.length);
+  const next = 'flowchart TD\nB["после"]';
+  mockView(`<pre class="mermaid">${over}</pre>`.repeat(5) + `<pre class="mermaid">${next}</pre>`);
+  const { inputs, parsed } = captureDiagrams();
+
+  const ready = showView(root);
+  await loadAsset("/vendor/mermaid.min.js");
+  await ready;
+
+  expect(parsed).toHaveLength(5);
+  expect(parsed.at(-1)).toBe(next);
+  expect(inputs).toEqual([next]);
+  const fifth = root.querySelectorAll("pre.mermaid")[4];
+  expect(fifth?.textContent).toBe(over);
+  expect(fifth?.nextElementSibling?.textContent).toContain("лимит подготовки");
+});
+
 test("при сбое доставки одной библиотеки другая сохраняет возможность отрисовки", async () => {
   mockView('<pre class="mermaid">graph TD\na--&gt;b</pre><span data-math-style="inline">x</span><p>Заметка</p>');
   const render = vi.fn((_tex: string, node: HTMLElement) => {

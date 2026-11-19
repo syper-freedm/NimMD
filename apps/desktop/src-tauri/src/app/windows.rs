@@ -446,6 +446,66 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn reuses_existing_windows_when_view_read_access_is_denied() {
+        use std::{
+            fs,
+            os::unix::fs::{PermissionsExt, symlink},
+        };
+
+        if rustix::process::geteuid().is_root() {
+            return;
+        }
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("заметка.md");
+        let alias = folder.path().join("ссылка.md");
+        fs::write(&path, "# Исходник").unwrap();
+        symlink(&path, &alias).unwrap();
+
+        let state = Mutex::new(Registry::default());
+        let PreparedLaunch { key, data } =
+            PreparedLaunch::new(Launch::from_path(path.clone())).unwrap();
+        let edit_label = Registry::lock(&state).register(key, data);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+
+        let request = || {
+            PreparedLaunch::new(Launch {
+                mode: Mode::View,
+                path: Some(alias.clone()),
+            })
+            .unwrap()
+        };
+        let PreparedLaunch { key, data } = request();
+        let key = key.expect("Канонический путь недоступного файла служит ключом окна");
+        assert!(
+            reuse(&state, &key, |label| {
+                assert_eq!(label, edit_label);
+                Ok(true)
+            })
+            .unwrap()
+        );
+        assert_eq!(
+            Registry::lock(&state)
+                .launch(&edit_label)
+                .unwrap()
+                .launch
+                .mode,
+            Mode::Edit
+        );
+
+        Registry::lock(&state).remove(&edit_label);
+        let view_label = Registry::lock(&state).register(Some(key), data);
+        let repeated_key = request().key.unwrap();
+        assert!(
+            reuse(&state, &repeated_key, |label| {
+                assert_eq!(label, view_label);
+                Ok(true)
+            })
+            .unwrap()
+        );
+    }
+
     #[test]
     fn closing_between_lookup_and_activation_allows_reopen() {
         let state = Mutex::new(Registry::default());

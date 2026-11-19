@@ -32,7 +32,10 @@ impl ViewFile {
                 Ok(canonical) => (Some(canonical), Ok(Arc::new(original))),
                 Err(error) => (None, Err(error)),
             },
-            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => (None, Err(error)),
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+                // Для поиска окна достаточно пути. Без дескриптора просмотр вернёт ошибку.
+                (canonical_file().ok(), Err(error))
+            }
             Err(error) => {
                 canonical_file()?;
                 if matches!(
@@ -190,8 +193,7 @@ mod tests {
         let bound = bind(&path);
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
         assert!(bound.render().unwrap_err().contains("«недоступный.md»"));
-        let (key, denied) = ViewFile::prepare(&path, || path.canonicalize()).unwrap();
-        assert!(key.is_none());
+        let (_, denied) = ViewFile::prepare(&path, || path.canonicalize()).unwrap();
         assert!(denied.render().unwrap_err().contains("«недоступный.md»"));
     }
 
