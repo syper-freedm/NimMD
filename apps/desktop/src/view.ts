@@ -5,7 +5,6 @@ import "../../../packages/theme/highlight.css";
 import "../../../packages/theme/data.css";
 
 type Block = { node: HTMLElement; source: string };
-type Diagram = Block & { payload: string };
 
 interface ViewLibraries extends Window {
   katex?: {
@@ -18,12 +17,9 @@ interface ViewLibraries extends Window {
       securityLevel: "strict"; startOnLoad: false; layout: "dagre";
       theme: "default" | "dark"; suppressErrorRendering: true; deterministicIds: true;
     }) => void;
-    parse: (source: string) => Promise<{ config: Record<string, unknown> }>;
     run: (options: { nodes: HTMLElement[]; suppressErrors: true }) => Promise<void>;
   };
 }
-
-type Mermaid = NonNullable<ViewLibraries["mermaid"]>;
 
 const libraries: ViewLibraries = window;
 const maxMathLength = 4096;
@@ -88,20 +84,8 @@ async function renderMath(blocks: Block[]): Promise<void> {
   }
 }
 
-function dagreOverrides(config: Record<string, unknown>): Record<string, "dagre" | { layout: "dagre" }> {
-  const overrides: [string, "dagre" | { layout: "dagre" }][] = [];
-  for (const [key, value] of Object.entries(config)) {
-    if (key === "layout" && typeof value === "string" && value.startsWith("elk")) {
-      overrides.push([key, "dagre"]);
-    } else if (value && typeof value === "object" && "layout" in value &&
-      typeof value.layout === "string" && value.layout.startsWith("elk")) {
-      overrides.push([key, { layout: "dagre" }]);
-    }
-  }
-  return Object.fromEntries(overrides);
-}
-
-async function loadMermaid(): Promise<Mermaid | null> {
+async function renderDiagrams(diagrams: Block[]): Promise<void> {
+  if (!diagrams.length) return;
   // Самозапуск Mermaid привязан к load. Подключаем скрипт после события.
   if (document.readyState !== "complete") {
     await new Promise<void>((resolve) => {
@@ -111,9 +95,10 @@ async function loadMermaid(): Promise<Mermaid | null> {
 
   const script = document.createElement("script");
   script.src = "/vendor/mermaid.min.js";
+  let mermaid;
   try {
     await loadAsset(script);
-    const mermaid = libraries.mermaid;
+    mermaid = libraries.mermaid;
     if (!mermaid) throw new Error("Mermaid недоступен");
     mermaid.initialize({
       securityLevel: "strict",
@@ -123,16 +108,9 @@ async function loadMermaid(): Promise<Mermaid | null> {
       suppressErrorRendering: true,
       deterministicIds: true,
     });
-    return mermaid;
   } catch {
-    return null;
-  }
-}
-
-async function renderDiagrams(mermaid: Mermaid, diagrams: Diagram[]): Promise<void> {
-  if (!diagrams.length) return;
-  for (const { node, source, payload } of diagrams) {
-    if (payload !== source) node.textContent = payload;
+    for (const { node } of diagrams) showBlockMessage(node, "Не удалось отрисовать диаграмму. Ресурс недоступен.");
+    return;
   }
   try {
     await mermaid.run({ nodes: diagrams.map(({ node }) => node), suppressErrors: true });
@@ -149,11 +127,8 @@ async function renderDiagrams(mermaid: Mermaid, diagrams: Diagram[]): Promise<vo
 
 async function renderBlocks(main: HTMLElement): Promise<void> {
   const math: Block[] = [];
-  const diagrams: Diagram[] = [];
-  let mermaid: Mermaid | null | undefined;
+  const diagrams: Block[] = [];
   let total = 0;
-  let parseCount = 0;
-  let parseTotal = 0;
   for (const node of main.querySelectorAll<HTMLElement>("[data-math-style], pre.mermaid")) {
     const source = node.textContent;
     const formula = node.hasAttribute("data-math-style");
@@ -165,49 +140,10 @@ async function renderBlocks(main: HTMLElement): Promise<void> {
       showBlockMessage(node, documentLimit);
       continue;
     }
-    if (formula) {
-      math.push({ node, source });
-      total += source.length;
-      continue;
-    }
-
-    // Неудачная подготовка расходует только бюджет разбора, ограничивающий работу Mermaid.parse.
-    if (parseCount >= maxBlocks || parseTotal + source.length > maxTotalLength) {
-      showBlockMessage(node, "Превышен лимит подготовки диаграмм для документа.");
-      continue;
-    }
-    if (mermaid === undefined) mermaid = await loadMermaid();
-    if (!mermaid) {
-      showBlockMessage(node, "Не удалось отрисовать диаграмму. Ресурс недоступен.");
-      continue;
-    }
-
-    parseCount += 1;
-    parseTotal += source.length;
-    let payload = source;
-    try {
-      const { config } = await mermaid.parse(source);
-      const overrides = dagreOverrides(config);
-      if (Object.keys(overrides).length) {
-        // Последняя директива перекрывает layout из frontmatter или init и сохраняет текст подписей.
-        payload += `\n%%{init: ${JSON.stringify(overrides)}}%%`;
-      }
-    } catch {
-      showBlockMessage(node, "Не удалось отрисовать диаграмму.");
-      continue;
-    }
-    if (payload.length > maxDiagramLength) {
-      showBlockMessage(node, diagramTooLong);
-      continue;
-    }
-    if (total + payload.length > maxTotalLength) {
-      showBlockMessage(node, documentLimit);
-      continue;
-    }
-    diagrams.push({ node, source, payload });
-    total += payload.length;
+    (formula ? math : diagrams).push({ node, source });
+    total += source.length;
   }
-  await Promise.all([renderMath(math), mermaid && renderDiagrams(mermaid, diagrams)]);
+  await Promise.all([renderMath(math), renderDiagrams(diagrams)]);
 }
 
 function watchWindowErrors(root: HTMLElement, notice: HTMLElement): Promise<void> {
