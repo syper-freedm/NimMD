@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Спайк блочных виджетов NimMD</title>
+  <style>
+    body { font: 16px system-ui; margin: 20px; }
+    .cm-editor { border: 1px solid; height: 480px; margin-block: 12px; }
+    .cm-scroller { overflow: auto; }
+    .cm-content table { border-collapse: collapse; margin-inline: 4px; }
+    .cm-content :is(th, td) { border: 1px solid; padding: 2px 8px; }
+    .cm-content .mermaid { margin: 0; }
+    .cm-content .mermaid svg { height: auto; width: 180px; }
+    output { display: block; white-space: pre-wrap; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>Блочные виджеты на 1 МиБ</h1>
+  <button id="run" type="button">Замерить задержку набора</button>
+  <div id="editor"></div>
+  <output id="result" role="status"></output>
+  <script type="module" src="../src/spike/benchmark.ts"></script>
+</body>
+</html>
