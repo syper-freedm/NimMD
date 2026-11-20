@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod assets;
 #[cfg(target_os = "macos")]
 mod cli;
 pub mod launch;
@@ -17,7 +18,8 @@ use std::{
     thread,
 };
 
-use tauri::{DragDropEvent, RunEvent, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, RunEvent, Url, WebviewWindow, WindowEvent};
+use tauri_plugin_opener::OpenerExt;
 
 use launch::Launch;
 use windows::{PreparedLaunch, Registry, WindowLaunch};
@@ -37,15 +39,47 @@ fn get_launch(
 async fn get_view(
     window: WebviewWindow,
     state: tauri::State<'_, Mutex<Registry>>,
-) -> Result<String, String> {
+) -> Result<RenderedView, String> {
     let file = Registry::lock(state.inner())
         .view_file(window.label())
         .ok_or_else(|| "У этого окна нет файла для просмотра.".to_owned())?;
-    tauri::async_runtime::spawn_blocking(move || file.render())
+    let body = tauri::async_runtime::spawn_blocking(move || file.render())
         .await
         .map_err(|_| {
             "Не удалось подготовить просмотр. Закройте окно и откройте файл снова.".to_owned()
-        })?
+        })??;
+    Ok(RenderedView {
+        body,
+        window_label: window.label().to_owned(),
+    })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenderedView {
+    body: String,
+    window_label: String,
+}
+
+fn external_url(input: &str) -> Option<Url> {
+    let url = Url::parse(input).ok()?;
+    match url.scheme() {
+        "http" | "https" if url.has_host() => Some(url),
+        "mailto"
+            if !url.path().is_empty() || url.query().is_some_and(|query| !query.is_empty()) =>
+        {
+            Some(url)
+        }
+        _ => None,
+    }
+}
+
+#[tauri::command]
+async fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+    let url = external_url(&url).ok_or_else(|| "Схема ссылки не поддерживается.".to_owned())?;
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
+        .map_err(|_| "Не удалось открыть ссылку в системном приложении.".to_owned())
 }
 
 fn prepare_startup(
@@ -63,6 +97,26 @@ fn prepare_startup(
     Ok(pending)
 }
 
+fn build_app() -> tauri::Result<tauri::App> {
+    tauri::Builder::default()
+        .manage(Mutex::new(Registry::default()))
+        // Встроенный скрипт Opener обрабатывает больше схем, чем разрешено NimMD.
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
+        .register_asynchronous_uri_scheme_protocol(assets::SCHEME, |context, request, responder| {
+            assets::serve(&context, &request, responder);
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_launch,
+            get_view,
+            open_external
+        ])
+        .build(tauri::generate_context!())
+}
+
 /// Запускает приложение или передаёт команду работающему экземпляру.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut launch = Launch::parse(std::env::args_os().skip(1))?;
@@ -72,10 +126,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
-    let app = tauri::Builder::default()
-        .manage(Mutex::new(Registry::default()))
-        .invoke_handler(tauri::generate_handler![get_launch, get_view])
-        .build(tauri::generate_context!())?;
+    let app = build_app()?;
     #[cfg(target_os = "macos")]
     let mut primary = Some(primary);
     #[cfg(target_os = "macos")]
@@ -169,4 +220,30 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     startup_error
         .take()
         .map_or(Ok(()), |error| Err(error.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::external_url;
+
+    #[test]
+    fn only_external_web_and_mail_links_are_opened() {
+        for url in [
+            "http://example.com/",
+            "HTTPS://example.com/",
+            "mailto:a@example.com",
+            "mailto:?subject=NimMD",
+        ] {
+            assert!(external_url(url).is_some(), "{url}");
+        }
+        for url in [
+            "file:///tmp/note.md",
+            "tel:+123",
+            "//example.com",
+            "nimmd-asset://localhost/path",
+            "mailto:",
+        ] {
+            assert!(external_url(url).is_none(), "{url}");
+        }
+    }
 }

@@ -1,10 +1,15 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { Launch } from "./launch";
 import "../../../packages/theme/nimmd.css";
 import "../../../packages/theme/highlight.css";
 import "../../../packages/theme/data.css";
 
 type Block = { node: HTMLElement; source: string };
+
+interface RenderedView {
+  body: string;
+  windowLabel: string;
+}
 
 interface ViewLibraries extends Window {
   katex?: {
@@ -36,6 +41,43 @@ function showBlockMessage(node: HTMLElement, message: string): void {
   notice.setAttribute("role", "status");
   notice.textContent = ` ${message}`;
   node.after(notice);
+}
+
+function prepareDocument(main: HTMLElement, windowLabel: string): void {
+  for (const image of main.querySelectorAll("img")) {
+    const src = image.getAttribute("src") ?? "";
+    const showPlaceholder = () => {
+      showBlockMessage(image, image.alt ? `Картинка недоступна: ${image.alt}` : "Картинка недоступна.");
+      image.remove();
+    };
+    if (!src) {
+      showPlaceholder();
+      continue;
+    }
+    image.addEventListener("error", showPlaceholder, { once: true });
+    if (!/^data:/i.test(src)) {
+      const path = src.split(/[?#]/, 1)[0] ?? "";
+      const endpoint = convertFileSrc(windowLabel, "nimmd-asset");
+      image.src = `${endpoint}?${new URLSearchParams({ path })}`;
+    }
+  }
+
+  const openLink = (event: MouseEvent) => {
+    if (!(event.target instanceof Element) || event.defaultPrevented) return;
+    const link = event.target.closest<HTMLAnchorElement>("a[href]");
+    const url = link?.getAttribute("href")?.trim();
+    if (!link || url?.startsWith("#")) return;
+    event.preventDefault();
+    if (url && /^(https?:\/\/|mailto:)/i.test(url)) {
+      void invoke("open_external", { url }).catch(() => {
+        showBlockMessage(link, "Не удалось открыть ссылку.");
+      });
+    }
+  };
+  main.addEventListener("click", openLink);
+  main.addEventListener("auxclick", (event) => {
+    if (event.button === 1) openLink(event);
+  });
 }
 
 function loadAsset(asset: HTMLLinkElement | HTMLScriptElement): Promise<void> {
@@ -184,11 +226,13 @@ export async function showView(root: HTMLElement): Promise<void> {
 
   let main;
   try {
-    const body = await invoke<string>("get_view");
-    const parsed = new DOMParser().parseFromString(body, "text/html");
-    const content = parsed.body.querySelector<HTMLElement>("main.nimmd");
+    const { body, windowLabel } = await invoke<RenderedView>("get_view");
+    // Ресурсы фрагмента остаются неактивными, пока ссылки на картинки не обработаны.
+    const parsed = new DOMParser().parseFromString(`<template>${body}</template>`, "text/html");
+    const content = parsed.querySelector("template")?.content.querySelector<HTMLElement>("main.nimmd");
     if (!content) throw new Error(viewError);
     main = document.importNode(content, true);
+    prepareDocument(main, windowLabel);
   } catch (error) {
     status.setAttribute("role", "alert");
     status.textContent = typeof error === "string" ? error : error instanceof Error ? error.message : viewError;

@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     io,
     path::PathBuf,
-    sync::{Mutex, MutexGuard, PoisonError},
+    sync::{Arc, Mutex, MutexGuard, PoisonError},
 };
 
 use serde::Serialize;
@@ -12,6 +12,7 @@ use tauri::{
 };
 
 use super::{
+    assets::DocumentAssets,
     launch::{Launch, Mode},
     view::ViewFile,
 };
@@ -30,6 +31,7 @@ pub(super) struct Registry {
     next_label: u64,
     by_file: HashMap<WindowKey, String>,
     by_label: HashMap<String, WindowLaunch>,
+    assets: HashMap<String, Arc<DocumentAssets>>,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -89,10 +91,20 @@ impl Registry {
         }
     }
 
+    pub(super) fn assets(&self, label: &str) -> Option<Arc<DocumentAssets>> {
+        self.assets.get(label).cloned()
+    }
+
     fn register(&mut self, file: Option<WindowKey>, data: WindowLaunch) -> String {
         let label = format!("nimmd-window-{}", self.next_label);
         self.next_label += 1;
         if let Some(file) = file {
+            if let WindowKey::File(path) = &file
+                && let Some(directory) = path.parent()
+                && let Ok(assets) = DocumentAssets::new(directory)
+            {
+                self.assets.insert(label.clone(), Arc::new(assets));
+            }
             self.by_file.insert(file, label.clone());
         }
         self.by_label.insert(label.clone(), data);
@@ -100,6 +112,7 @@ impl Registry {
     }
 
     pub(super) fn remove(&mut self, label: &str) {
+        self.assets.remove(label);
         self.by_label.remove(label);
         self.by_file.retain(|_, current| current != label);
     }
@@ -161,26 +174,23 @@ fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::R
         .cloned()
         .ok_or_else(|| window_error(&title, "В конфигурации отсутствуют параметры окна."))?;
     config.title.clone_from(&title);
-    let view_url = if data.launch.mode == Mode::View {
+    let page = if data.launch.mode == Mode::View {
         const VIEW_PAGE: &str = "view.html";
         config.url = WebviewUrl::App(VIEW_PAGE.into());
-        Some(
-            view_url(app, config.use_https_scheme, VIEW_PAGE)
-                .map_err(|error| window_error(&title, error))?,
-        )
+        VIEW_PAGE
     } else {
-        None
+        // Tauri загружает index.html по корневому адресу приложения.
+        ""
     };
+    let page = page_url(app, config.use_https_scheme, page)
+        .map_err(|error| window_error(&title, error))?;
     config.label = registry(app).register(file, data);
 
     let result = (|| {
-        let mut builder = WebviewWindowBuilder::from_config(app, &config)?;
-        if let Some(view_url) = view_url {
-            builder = builder
-                .on_navigation(move |url| same_page(url, &view_url))
-                .on_new_window(|_, _| NewWindowResponse::Deny);
-        }
-        let window = builder.build()?;
+        let window = WebviewWindowBuilder::from_config(app, &config)?
+            .on_navigation(move |url| same_page(url, &page))
+            .on_new_window(|_, _| NewWindowResponse::Deny)
+            .build()?;
         if let Err(error) = activate(&window) {
             let _ = window.destroy();
             return Err(error);
@@ -194,7 +204,7 @@ fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::R
     Ok(())
 }
 
-fn view_url(app: &AppHandle, https: bool, page: &str) -> io::Result<Url> {
+fn page_url(app: &AppHandle, https: bool, page: &str) -> io::Result<Url> {
     if tauri::is_dev()
         && let Some(dev_url) = &app.config().build.dev_url
     {
@@ -218,6 +228,9 @@ fn view_url(app: &AppHandle, https: bool, page: &str) -> io::Result<Url> {
 fn same_page(url: &Url, page: &Url) -> bool {
     let mut url = url.clone();
     url.set_fragment(None);
+    if url.path().is_empty() && page.path() == "/" {
+        url.set_path("/");
+    }
     &url == page
 }
 
@@ -444,6 +457,76 @@ mod tests {
         ] {
             assert!(!same_page(&Url::parse(url).unwrap(), &page));
         }
+    }
+
+    #[test]
+    fn editor_navigation_allows_both_spellings_of_the_tauri_root() {
+        let page = Url::parse("tauri://localhost/").unwrap();
+        for url in [
+            "tauri://localhost",
+            "tauri://localhost/",
+            "tauri://localhost#anchor",
+        ] {
+            assert!(same_page(&Url::parse(url).unwrap(), &page), "{url}");
+        }
+        for url in [
+            "tauri://localhost/view.html",
+            "tauri://elsewhere/",
+            "file:///",
+        ] {
+            assert!(!same_page(&Url::parse(url).unwrap(), &page), "{url}");
+        }
+    }
+    #[test]
+    fn assets_are_scoped_to_the_open_document_and_window_lifetime() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut registry = Registry::default();
+        let register = |name: &str, contents: u8| {
+            let folder = directory.path().join(name);
+            std::fs::create_dir(&folder).unwrap();
+            let path = folder.join("note.md");
+            std::fs::write(&path, "").unwrap();
+            for suffix in 1..=5 {
+                std::fs::write(
+                    folder.join(format!("ф #{suffix}.PNG")),
+                    vec![contents; 5 * 1024 * 1024],
+                )
+                .unwrap();
+            }
+            PreparedLaunch::new(Launch::from_path(path)).unwrap()
+        };
+        let PreparedLaunch { key, data } = register("first", 1);
+        let first = registry.register(key, data);
+        let PreparedLaunch { key, data } = register("second", 2);
+        let second = registry.register(key, data);
+        for suffix in 1..=4 {
+            let resource = format!("%D1%84%20%23{suffix}.PNG");
+            let image = registry.assets(&first).unwrap().read(&resource).unwrap();
+            assert_eq!(image.content_type, "image/png");
+            assert_eq!(image.bytes.first(), Some(&1));
+        }
+        let current = registry.assets(&first).unwrap();
+        assert!(current.read("%D1%84%20%231.PNG").is_ok());
+        assert!(current.read("%D1%84%20%235.PNG").is_err());
+        let other = registry.assets(&second).unwrap();
+        assert_eq!(
+            other.read("%D1%84%20%235.PNG").unwrap().bytes.first(),
+            Some(&2)
+        );
+        let original_path = directory.path().join("first/note.md");
+        registry.remove(&first);
+        assert!(registry.assets(&first).is_none());
+        let PreparedLaunch { key, data } =
+            PreparedLaunch::new(Launch::from_path(original_path)).unwrap();
+        let reopened = registry.register(key, data);
+        assert!(
+            registry
+                .assets(&reopened)
+                .unwrap()
+                .read("%D1%84%20%235.PNG")
+                .is_ok()
+        );
+        assert!(registry.assets("unknown").is_none());
     }
 
     #[cfg(unix)]

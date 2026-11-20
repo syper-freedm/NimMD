@@ -6,8 +6,9 @@
   "packageManager": "pnpm@12.18.0",
   "engines": { "node": ">=26" },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "pnpm vendor && vite",
+    "build": "pnpm vendor && tsc --noEmit && vite build",
+    "vendor": "bash ../../packages/vendor/fetch.sh && node scripts/stage-vendor.mjs",
     "lint": "eslint src",
     "test": "vitest run",
     "tauri": "tauri"

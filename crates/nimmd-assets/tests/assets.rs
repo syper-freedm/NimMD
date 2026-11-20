@@ -36,6 +36,20 @@ fn doc_in(name: &str) -> io::Result<PathBuf> {
 
 const NO_DOC: &str = "/nonexistent-nimmd/doc.md";
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn reads_known_image_without_directory_listing_permission() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let doc = doc_in("search-only-directory").unwrap();
+    let folder = doc.parent().unwrap().join("images");
+    write(&folder.join("a.png"), b"image").unwrap();
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o100)).unwrap();
+    let result = read_asset(&doc, "images/a.png", &mut AssetBudget::new());
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(result, Ok(b"image".to_vec()));
+}
+
 #[test]
 fn reads_images_next_to_document_and_counts_each_file_once() {
     let dir = fresh_dir("sc001").unwrap().join("docs");

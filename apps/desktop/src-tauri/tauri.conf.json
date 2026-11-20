@@ -15,6 +15,7 @@
     "security": {
       "csp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
       "devCsp": "default-src 'none'; img-src nimmd-asset: data:; connect-src ipc: http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      "dangerousDisableAssetCspModification": ["style-src"],
       "capabilities": ["main"]
     }
   },

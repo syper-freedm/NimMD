@@ -15,8 +15,6 @@ pub const MAX_ASSET_BYTES: u64 = 5 * 1024 * 1024;
 /// Предел суммы размеров разных файлов за один бюджет.
 pub const MAX_BUDGET_BYTES: u64 = 20 * 1024 * 1024;
 
-const IMAGE_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
-
 /// Бюджет чтения: сумма байт разных файлов и их канонические пути.
 ///
 /// Повторное чтение уже учтённого пути лимит не расходует и ничем не ограничено:
@@ -79,6 +77,156 @@ impl fmt::Display for AssetError {
 
 impl std::error::Error for AssetError {}
 
+/// Картинка с типом, определённым по расширению конечного файла.
+pub struct Image {
+    pub bytes: Vec<u8>,
+    pub content_type: &'static str,
+}
+
+/// Каталог документа, выбранный хостом.
+pub struct AssetDirectory {
+    path: PathBuf,
+    #[cfg(unix)]
+    root: File,
+}
+
+impl AssetDirectory {
+    /// Открывает канонический каталог документа. На Unix удерживает дескриптор
+    /// каталога, чтобы подмена пути после открытия окна не меняла область чтения.
+    pub fn open(canonical_directory: &Path) -> Result<Self, AssetError> {
+        #[cfg(unix)]
+        let root = open_directory(canonical_directory)?;
+        Ok(Self {
+            path: canonical_directory.to_owned(),
+            #[cfg(unix)]
+            root,
+        })
+    }
+
+    /// Читает относительную ссылку в пределах каталога и бюджета документа.
+    pub fn read(&self, href: &str, budget: &mut AssetBudget) -> Result<Image, AssetError> {
+        self.read_relative(&relative_path(href)?, budget)
+    }
+
+    fn read_relative(
+        &self,
+        relative: &Path,
+        budget: &mut AssetBudget,
+    ) -> Result<Image, AssetError> {
+        let path = fs::canonicalize(self.path.join(relative)).map_err(|_| AssetError::Io)?;
+        let relative = path
+            .strip_prefix(&self.path)
+            .map_err(|_| AssetError::Escape)?;
+        let content_type = content_type(relative).ok_or(AssetError::NotImage)?;
+        #[cfg(unix)]
+        let file = open_file(&self.root, relative)?;
+        #[cfg(not(unix))]
+        let file = File::open(&path).map_err(|_| AssetError::Io)?;
+        let meta = file.metadata().map_err(|_| AssetError::Io)?;
+        if !meta.is_file() {
+            return Err(AssetError::NotImage);
+        }
+        if meta.len() > MAX_ASSET_BYTES {
+            return Err(AssetError::TooLarge);
+        }
+        let known = budget.seen.contains(&path);
+        if !known && budget.used.saturating_add(meta.len()) > MAX_BUDGET_BYTES {
+            return Err(AssetError::BudgetExceeded);
+        }
+
+        let mut bytes = Vec::new();
+        file.take(MAX_ASSET_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| AssetError::Io)?;
+        let read = bytes.len() as u64;
+        if read > MAX_ASSET_BYTES {
+            return Err(AssetError::TooLarge);
+        }
+        if !known {
+            if budget.used.saturating_add(read) > MAX_BUDGET_BYTES {
+                return Err(AssetError::BudgetExceeded);
+            }
+            budget.used += read;
+            budget.seen.insert(path);
+        }
+        Ok(Image {
+            bytes,
+            content_type,
+        })
+    }
+}
+
+fn content_type(path: &Path) -> Option<&'static str> {
+    match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        _ => None,
+    }
+}
+
+#[cfg(unix)]
+fn open_directory(path: &Path) -> Result<File, AssetError> {
+    let relative = path.strip_prefix("/").map_err(|_| AssetError::Io)?;
+    let root = File::open("/").map_err(|_| AssetError::Io)?;
+    open_subdirectories(&root, relative)
+}
+
+#[cfg(unix)]
+fn open_subdirectories(root: &File, relative: &Path) -> Result<File, AssetError> {
+    use rustix::fs::{Mode, OFlags, openat};
+    use std::path::Component;
+
+    let mut current = root.try_clone().map_err(|_| AssetError::Io)?;
+    for component in relative.components() {
+        let Component::Normal(name) = component else {
+            return Err(AssetError::Escape);
+        };
+        current = openat(
+            &current,
+            name,
+            directory_access() | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|_| AssetError::Io)?
+        .into();
+    }
+    Ok(current)
+}
+
+#[cfg(unix)]
+fn directory_access() -> rustix::fs::OFlags {
+    use rustix::fs::OFlags;
+
+    // Для поиска файла с известным именем право читать список каталога не нужно.
+    #[cfg(target_vendor = "apple")]
+    return OFlags::from_bits_retain(u32::from_ne_bytes(libc::O_SEARCH.to_ne_bytes()));
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    return OFlags::PATH;
+    #[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+    return OFlags::RDONLY;
+}
+
+#[cfg(unix)]
+fn open_file(root: &File, relative: &Path) -> Result<File, AssetError> {
+    use rustix::fs::{Mode, OFlags, openat};
+
+    let name = relative.file_name().ok_or(AssetError::NotImage)?;
+    let parent = open_subdirectories(root, relative.parent().ok_or(AssetError::Io)?)?;
+    // После canonicalize путь мог измениться. Открываем только обычный путь
+    // через дескриптор каталога, без перехода по новым символическим ссылкам.
+    openat(
+        &parent,
+        name,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::NOCTTY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map(File::from)
+    .map_err(|_| AssetError::Io)
+}
+
 /// Читает картинку `href` относительно каталога документа `doc_path`.
 ///
 /// Байты отдаются как есть: SVG — активное содержимое, хост показывает его только
@@ -88,6 +236,13 @@ pub fn read_asset(
     href: &str,
     budget: &mut AssetBudget,
 ) -> Result<Vec<u8>, AssetError> {
+    let relative = relative_path(href)?;
+    let doc = fs::canonicalize(doc_path).map_err(|_| AssetError::Io)?;
+    let directory = AssetDirectory::open(doc.parent().ok_or(AssetError::Io)?)?;
+    Ok(directory.read_relative(&relative, budget)?.bytes)
+}
+
+fn relative_path(href: &str) -> Result<PathBuf, AssetError> {
     let href = decode(href)?;
     if has_scheme(&href) {
         return Err(AssetError::Scheme);
@@ -98,49 +253,7 @@ pub fn read_asset(
     if href.starts_with('~') {
         return Err(AssetError::Home);
     }
-    let parts = normalize(&href)?;
-
-    let doc = fs::canonicalize(doc_path).map_err(|_| AssetError::Io)?;
-    let base = doc.parent().ok_or(AssetError::Io)?;
-    let mut candidate = base.to_path_buf();
-    candidate.extend(parts);
-    let path = fs::canonicalize(&candidate).map_err(|_| AssetError::Io)?;
-    if !path.starts_with(base) {
-        return Err(AssetError::Escape);
-    }
-
-    let is_image = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| IMAGE_EXTENSIONS.iter().any(|x| e.eq_ignore_ascii_case(x)));
-    if !is_image {
-        return Err(AssetError::NotImage);
-    }
-    let meta = fs::metadata(&path).map_err(|_| AssetError::Io)?;
-    if !meta.is_file() {
-        return Err(AssetError::NotImage);
-    }
-    if meta.len() > MAX_ASSET_BYTES {
-        return Err(AssetError::TooLarge);
-    }
-    let known = budget.seen.contains(&path);
-    if !known && budget.used.saturating_add(meta.len()) > MAX_BUDGET_BYTES {
-        return Err(AssetError::BudgetExceeded);
-    }
-
-    let mut bytes = Vec::new();
-    File::open(&path)
-        .and_then(|f| f.take(MAX_ASSET_BYTES + 1).read_to_end(&mut bytes))
-        .map_err(|_| AssetError::Io)?;
-    let read = bytes.len() as u64;
-    if read > MAX_ASSET_BYTES {
-        return Err(AssetError::TooLarge);
-    }
-    if !known {
-        budget.used += read;
-        budget.seen.insert(path);
-    }
-    Ok(bytes)
+    Ok(normalize(&href)?.into_iter().collect())
 }
 
 /// Однократный URL-decode `%XX`.

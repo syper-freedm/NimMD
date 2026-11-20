@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { clearMocks, mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
 import { showView } from "./view";
 
 const root = document.createElement("div");
@@ -17,9 +17,13 @@ afterEach(() => {
   clearMocks();
 });
 
+function viewPayload(body: string) {
+  return { body, windowLabel: "nimmd-window-3" };
+}
+
 function mockView(body: string): void {
   mockIPC((command) => {
-    if (command === "get_view") return '<main class="nimmd">' + body + "</main>";
+    if (command === "get_view") return viewPayload('<main class="nimmd">' + body + "</main>");
     if (command === "get_launch") return { mode: "view", path: "note.md", errors: [] };
     throw new Error(command);
   });
@@ -36,8 +40,8 @@ async function loadAsset(path: string, event = "load"): Promise<void> {
 
 test("загрузка и TXT используют IPC окна и импортируют текст без активных узлов", async () => {
   const commands: [string, unknown][] = [];
-  let deliver!: (body: string) => void;
-  const fragment = new Promise<string>((resolve) => { deliver = resolve; });
+  let deliver!: (view: ReturnType<typeof viewPayload>) => void;
+  const fragment = new Promise<ReturnType<typeof viewPayload>>((resolve) => { deliver = resolve; });
   mockIPC((command, args) => {
     commands.push([command, args]);
     return command === "get_view"
@@ -46,12 +50,41 @@ test("загрузка и TXT используют IPC окна и импорт�
   });
   const ready = showView(root);
   expect(root.querySelector('[role="status"]')?.textContent).toContain("Загрузка");
-  deliver('<main class="nimmd nimmd-data" data-kind="text"><pre class="data">&lt;b&gt;буквы&lt;/b&gt;</pre></main>');
+  deliver(viewPayload('<main class="nimmd nimmd-data" data-kind="text"><pre class="data">&lt;b&gt;буквы&lt;/b&gt;</pre></main>'));
   await ready;
   expect(commands).toContainEqual(["get_view", {}]);
   expect(root.querySelector("main[data-kind=text] pre")?.textContent).toBe("<b>буквы</b>");
   expect(root.querySelector("b, [role=status]")).toBeNull();
   expect(document.head.querySelector('[src^="/vendor/"], [href^="/vendor/"]')).toBeNull();
+});
+
+test("картинки запрашиваются по схеме окна с сохранением исходного кодирования пути", async () => {
+  mockConvertFileSrc("macos");
+  mockView('<img src="./assets/%D1%84%20a%23.png" alt="Схема"><img src="%2e%2e/photo.png" alt="Снаружи">');
+  await showView(root);
+  const [image, denied] = root.querySelectorAll("img");
+  expect(image?.getAttribute("src")).toBe("nimmd-asset://localhost/nimmd-window-3?path=.%2Fassets%2F%25D1%2584%2520a%2523.png");
+  expect(denied?.getAttribute("src")).toBe("nimmd-asset://localhost/nimmd-window-3?path=%252e%252e%2Fphoto.png");
+  denied?.dispatchEvent(new Event("error"));
+  expect(root.querySelectorAll("img")).toHaveLength(1);
+  expect(root.querySelector('[role="status"]')?.textContent).toContain("Снаружи");
+});
+
+test("внешние ссылки передаются системе, якоря работают, остальные переходы подавляются", async () => {
+  const opened: unknown[] = [];
+  mockIPC((command, args) => {
+    if (command === "get_view") return viewPayload('<main class="nimmd">' +
+      '<a href="https://example.com/">Сайт</a><a href="mailto:example@example.com">Почта</a>' +
+      '<a href="#note">Якорь</a><a href="file:///note.md">Файл</a><a href="">Нет адреса</a></main>');
+    if (command === "get_launch") return { mode: "view", path: "note.md", errors: [] };
+    if (command === "open_external") { opened.push(args); return; }
+    throw new Error(command);
+  });
+  await showView(root);
+  const links = [...root.querySelectorAll("a")];
+  const navigates = links.map(link => link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+  expect(navigates).toEqual([false, false, true, false, false]);
+  expect(opened).toEqual([{ url: "https://example.com/" }, { url: "mailto:example@example.com" }]);
 });
 
 test("ошибка чтения показывается текстом с именем файла и способом повторить открытие", async () => {
@@ -72,7 +105,7 @@ test("оконная ошибка обновляется отдельно от �
   mockIPC((command) => {
     if (command === "get_view") {
       reads += 1;
-      return '<main class="nimmd"><p>Заметка</p></main>';
+      return viewPayload('<main class="nimmd"><p>Заметка</p></main>');
     }
     return { mode: "view", path: "note.md", errors };
   });
