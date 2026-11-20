@@ -1,14 +1,29 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, StateEffect, StateField, Text, type Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, keymap, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import {
+  EditorState,
+  StateEffect,
+  StateField,
+  Text,
+  type Range,
+} from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  keymap,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { markdownLanguage } from "./markdown";
 
 const togglePreview = StateEffect.define();
 const previewEnabled = StateField.define({
   create: () => true,
   update(enabled, transaction) {
-    return transaction.effects.some((effect) => effect.is(togglePreview)) ? !enabled : enabled;
+    return transaction.effects.some((effect) => effect.is(togglePreview))
+      ? !enabled
+      : enabled;
   },
 });
 
@@ -27,31 +42,50 @@ function previewDecorations(view: EditorView): DecorationSet {
       enter({ name, from: start, to: end }) {
         if (name !== "StrongEmphasis") return;
         const line = state.doc.lineAt(start);
-        if (end > line.to || start < from || end > to
-          || state.selection.ranges.some((selection) => selection.from <= line.to && selection.to >= line.from)) return;
-        ranges.push(hiddenMarker.range(start, start + 2), strongText.range(start + 2, end - 2),
-          hiddenMarker.range(end - 2, end));
+        if (
+          end > line.to ||
+          start < from ||
+          end > to ||
+          state.selection.ranges.some(
+            (selection) =>
+              selection.from <= line.to && selection.to >= line.from,
+          )
+        )
+          return;
+        ranges.push(
+          hiddenMarker.range(start, start + 2),
+          strongText.range(start + 2, end - 2),
+          hiddenMarker.range(end - 2, end),
+        );
       },
     });
   }
   return Decoration.set(ranges, true);
 }
 
-const livePreview = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
+const livePreview = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
 
-  constructor(view: EditorView) {
-    this.decorations = previewDecorations(view);
-  }
-
-  update(update: ViewUpdate): void {
-    if (update.docChanged || update.selectionSet || update.viewportChanged
-      || syntaxTree(update.state) !== syntaxTree(update.startState)
-      || update.state.field(previewEnabled) !== update.startState.field(previewEnabled)) {
-      this.decorations = previewDecorations(update.view);
+    constructor(view: EditorView) {
+      this.decorations = previewDecorations(view);
     }
-  }
-}, { decorations: (plugin) => plugin.decorations });
+
+    update(update: ViewUpdate): void {
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        update.viewportChanged ||
+        syntaxTree(update.state) !== syntaxTree(update.startState) ||
+        update.state.field(previewEnabled) !==
+          update.startState.field(previewEnabled)
+      ) {
+        this.decorations = previewDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
 
 const editorTheme = EditorView.theme({
   "&": { minHeight: "12rem" },
@@ -72,7 +106,9 @@ export function mountEditor(parent: HTMLElement, source: string): EditorView {
       extensions: [
         EditorState.lineSeparator.of("\n"),
         EditorView.clipboardInputFilter.of(normalizeCrlf),
-        EditorView.contentAttributes.of({ "aria-label": "Исходный текст Markdown" }),
+        EditorView.contentAttributes.of({
+          "aria-label": "Исходный текст Markdown",
+        }),
         EditorView.lineWrapping,
         markdownLanguage(doc),
         history(),
@@ -80,10 +116,13 @@ export function mountEditor(parent: HTMLElement, source: string): EditorView {
         livePreview,
         editorTheme,
         keymap.of([
-          { key: "Mod-/", run(view) {
-            view.dispatch({ effects: togglePreview.of(null) });
-            return true;
-          } },
+          {
+            key: "Mod-/",
+            run(view) {
+              view.dispatch({ effects: togglePreview.of(null) });
+              return true;
+            },
+          },
           ...defaultKeymap.filter((binding) => binding.key !== "Mod-/"),
           ...historyKeymap,
         ]),

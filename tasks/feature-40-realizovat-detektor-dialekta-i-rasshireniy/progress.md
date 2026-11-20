@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,7 +57,8 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
-```json
+
+````json
 {
   "repo": "syper-freedm/NimMD",
   "issue": 40,
@@ -65,9 +66,7 @@
   "slug": "realizovat-detektor-dialekta-i-rasshireniy",
   "branch": "feat/40-realizovat-detektor-dialekta-i",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-25T11:08:43+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T11:08:53+00:00",
@@ -138,10 +135,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "comrak 0.56.0 есть в индексе crates.io; API и фича syntect-fancy не сверялись — крейт не скачан в песочнице"
       ]
@@ -151,9 +145,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "Новых прав, данных классов, сетевого/файлового доступа и защищённых потоков нет — security.md не создавался.",
         "comrak 0.56 есть в [workspace.dependencies], BSD-2-Clause в белом списке deny.toml; split_frontmatter/frontmatter_dialect/MAX_BYTES существуют в text.rs."
@@ -164,10 +156,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "Все 13 AC наблюдаемы, детерминированы и в границах; validate-tests: OK; test-cases.md 14 сценариев (13 integration в crates/nimmd-core/tests/detect.rs + 1 static), около 2676 из 2700 токенов.",
         "QA-001/QA-002 — NOTICE: однозначные признаки `%%…%%` и блок метаданных MMD нигде не проверены изолированно; AC-12 не называет ожидаемый диалект (SC-013 ждёт CommonMark).",
@@ -190,11 +179,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002",
-        "ARCH-003"
-      ],
+      "findings": ["ARCH-001", "ARCH-002", "ARCH-003"],
       "notes": [
         "Режим дельты: проверены только FR-1, FR-9, AC-4, AC-8, AC-12; правки согласованы с FR-4/FR-5 и закрывают ARCH-001/ARCH-002. ARCH-003 — новый NOTICE: стойкость comrak к глубокой вложенности не проверена."
       ]
@@ -204,9 +189,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "Режим дельты: FR-1, FR-9, AC-4, AC-8, AC-12 проверены; правка FR-9/AC-12 закрывает SEC-001 (итеративный обход AST, тест на 10 000 уровней цитаты); новых находок нет, reviews.md не менялся."
       ]
@@ -216,10 +199,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "Дельта (FR-1, FR-9, AC-4, AC-8, AC-12) закрывает QA-001 и QA-002; новые случаи AC-4 (только `%%c%%`), AC-8(д) и AC-12 (вложенность `>` x 10 000) согласуются с FR-4/FR-5, наблюдаемы и детерминированы.",
         "test-cases.md: SC-004, SC-006 и SC-013 дополнены новыми случаями; для экономии объёма SC-001 и SC-014 сокращены; 2693 из 2700 токенов; validate-tests: OK.",
@@ -323,9 +303,7 @@
       "files_count": 6,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T11:23:05+00:00",
@@ -343,9 +321,7 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-004"
-      ],
+      "findings": ["ARCH-004"],
       "notes": [
         "cargo clippy --workspace --all-targets -- -D warnings: Finished, без предупреждений",
         "Smoke-прогон detect (временный крейт в tmp_dir, удалён): ожидания AC-9..AC-13 совпали; 10 000 уровней > не роняют поток со стеком 512 КБ (debug)",
@@ -357,9 +333,7 @@
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "BLOCKER",
-      "findings": [
-        "SEC-002"
-      ],
+      "findings": ["SEC-002"],
       "notes": [
         "SEC-002 BLOCKER (OWASP API4): detect() разбирает недоверенный вход comrak 0.56, разбор квадратичен по глубине вложенности '>'. Замер (release, отдельный крейт в tmp_dir): 10k '>' 37 мс, 30k 359 мс, 60k 1,30 с; экстраполяция: 1 МБ — минуты, MAX_BYTES 10 МБ — часы. ФД («Данные, права, ошибки») требует линейной сложности, а Quick Look на таком файле зависнет. Ожидается: предел глубины вложенности контейнеров до parse_document, тест на 60k '>' с ограничением по времени",
         "cargo deny check (вне песочницы: lock в ~/.cargo/advisory-dbs только для чтения): advisories ok, bans ok, licenses ok, sources ok",
@@ -406,10 +380,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-005"
-      ],
+      "findings": ["ARCH-001", "ARCH-005"],
       "notes": [
         "Режим дельты: проверены только FR-9, FR-10, AC-14, «Данные, права, ошибки», «Карта реализации». FR-10 в parse.rs рядом с options() — без нового слоя; deny.toml внесён в карту (ARCH-004 учтён). ARCH-002/ARCH-003 свёрнуты как закрытые. ARCH-005 — новый NOTICE: предел FR-10 построчный, вложенность списков через отступ продолжения его обходит; замер comrak на такой лестнице не делался."
       ]
@@ -432,10 +403,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "BLOCKER",
-      "findings": [
-        "QA-003",
-        "QA-004"
-      ],
+      "findings": ["QA-003", "QA-004"],
       "notes": [
         "QA-003 (BLOCKER): AC-14(в) противоречит FR-6. В FR-6 маркер задачи стоит «после пробелов», поэтому строка `> > > - [ ] a` (она начинается с `>`) задачей не считается: `is_task` в crates/nimmd-core/src/detect.rs делает только `trim_start()` и не снимает `>`. Значит `detect` даст `CommonMark` и все features false, а AC ждёт `Gfm` и `tasklists` true. Два выхода: в FR-6 пропускать префикс контейнеров FR-10 или переписать ожидание (в).",
         "QA-004 (NOTICE): функция FR-10 объявлена `pub(crate)`, поэтому из `tests/detect.rs` её не вызвать. Для AC-14 «64 маркера до `\\`», обратимость и `Cow::Borrowed` проверит только unit-тест `#[cfg(test)]` в parse.rs. В карте реализации сейчас указан только tests/detect.rs.",
@@ -472,10 +440,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-005"
-      ],
+      "findings": ["ARCH-001", "ARCH-005"],
       "notes": [
         "Дельта: limit_nesting/MAX_NESTING перенесены в pub-модуль text.rs (предобработка без comrak, правила тотальности text.rs выполнимы через split_at_checked/обход char_indices); AC-14(в) теперь CommonMark — согласовано с FR-6. Новых находок нет."
       ]
@@ -485,9 +450,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "Дельта FR-10/AC-14: limit_nesting перенесена в text.rs как pub (чистая функция без I/O под правилами тотальности text.rs), ограничение 64 маркера и тест 60k (а)/(б) сохранены; AC-14(в) — смена ожиданий детектора, вне области ИБ. reviews.md не менялся."
       ]
@@ -557,9 +520,7 @@
       "event": "handback_accepted",
       "phase": "backend",
       "verdict": "DONE",
-      "findings": [
-        "SEC-002"
-      ],
+      "findings": ["SEC-002"],
       "notes": [
         "ARCH-005 (NOTICE) не реализован: он расходится с FR-10, где предел считается по маркерам одной строки. Лестница подтверждена замером в debug: строка k = k табов + 64 «- » + x; 200 строк (46 КБ) — 0,35 с, 400 строк (132 КБ) — 1,18 с, 800 строк (424 КБ, ~51 000 уровней) — 4,5 с. Время растёт квадратично от глубины, 10 МБ — минуты. Чтобы закрыть, нужна правка ФД: ограничить и глубину продолжения, например колонку отступа (≤ 2·MAX_NESTING) перед `\\`",
         "SEC-002: в text.rs добавлены MAX_NESTING = 64 и limit_nesting (FR-10): без индексации и срезов, только strip_prefix/get; detect.rs разбирает comrak текст после limit_nesting(src). Сканер признаков работает по исходному тексту",
@@ -598,9 +559,7 @@
       "files_count": 7,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ],
+      "skip": ["documentation"],
       "delta": {
         "code-review": [
           "crates/nimmd-core/src/detect.rs",
@@ -624,9 +583,7 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-004"
-      ],
+      "findings": ["ARCH-004"],
       "notes": [
         "Дельта: limit_nesting (FR-10) в text.rs и её вызов в detect.rs перед comrak; новых находок нет. cargo clippy -p nimmd-core -D warnings и cargo test -p nimmd-core — ok."
       ]
@@ -680,9 +637,7 @@
       "event": "handback_accepted",
       "phase": "backend-tests",
       "verdict": "DONE",
-      "findings": [
-        "QA-005"
-      ],
+      "findings": ["QA-005"],
       "notes": [
         "QA-005: добавлен раннер fixtures_match_profiles в crates/nimmd-core/tests/detect.rs: обходит tests/fixtures/<группа>/*.md (std::fs, без новых крейтов; serde_json уже в dev-dependencies), читает парный <имя>.profile.json как Profile (deny_unknown_fields, все 9 полей Features обязательны), сверяет с nimmd_core::detect; в сообщении assert — путь фикстуры относительно fixtures/ (например features/callouts.md); отсутствующий или битый .profile.json — panic с именем фикстуры; assert checked > 0 против пустого каталога. Inline-тесты detect.rs не тронуты.",
         "Перед detect текст проходит text::normalize_newlines: checkout с autocrlf на Windows CI даёт \\r\\n, а предусловие detect — \\n.",
@@ -1023,5 +978,6 @@
     "testing": "5a26b964b2e4194b50fda682ea4d362a904a75d0e2bbf23173fd5c31679d4ecf"
   }
 }
-```
+````
+
 <!-- afd-state-snapshot:end -->

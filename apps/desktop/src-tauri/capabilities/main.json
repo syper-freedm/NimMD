@@ -3,5 +3,10 @@
   "identifier": "main",
   "description": "Окно получает свой документ и может открыть разрешённую внешнюю ссылку в системном приложении.",
   "windows": ["nimmd-window-*"],
-  "permissions": ["allow-get-launch", "allow-get-view", "allow-get-editor", "allow-open-external"]
+  "permissions": [
+    "allow-get-launch",
+    "allow-get-view",
+    "allow-get-editor",
+    "allow-open-external"
+  ]
 }

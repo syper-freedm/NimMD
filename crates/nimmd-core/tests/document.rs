@@ -501,7 +501,11 @@ fn asset_mode_link_follows_profile() {
     assert!(mermaid.contains("<script src=\"assets/mermaid.min.js\"></script>"));
     assert!(!mermaid.contains("katex.min"), "{mermaid}");
     assert!(!mermaid.contains("trust: false"), "{mermaid}");
-    assert!(mermaid.contains("securityLevel: 'strict'"), "{mermaid}");
+    assert!(
+        mermaid.contains("securityLevel: 'strict'")
+            || mermaid.contains("securityLevel: \"strict\""),
+        "{mermaid}"
+    );
     assert!(mermaid.contains("DOMContentLoaded"), "{mermaid}");
 
     assert!(!plain.contains("<script"), "{plain}");
@@ -547,7 +551,10 @@ fn inline_assets_escape_closing_tags() {
     assert!(html.contains("c<\\/style>s"), "{html}");
     assert!(html.contains("m<\\/script>j"), "{html}");
     assert!(html.contains("trust: false"), "{html}");
-    assert!(html.contains("securityLevel: 'strict'"), "{html}");
+    assert!(
+        html.contains("securityLevel: 'strict'") || html.contains("securityLevel: \"strict\""),
+        "{html}"
+    );
     // Второй `<style>` — только у KaTeX при `Inline`
     assert_eq!(html.matches("<style").count(), 2, "{html}");
     assert!(!html.contains("<link"), "{html}");

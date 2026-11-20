@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "realizovat-kreyt-nimmd-assets-dlya-bezopasnogo-chteniya",
   "branch": "feat/47-realizovat-kreyt-nimmd-assets-dlya",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-25T23:07:36+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T23:07:36+00:00",
@@ -132,10 +129,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "Дублей нет (git grep read_asset/canonicalize/nimmd-assets пуст); правило semgrep nimmd-core-no-io ограничено crates/nimmd-core/src, новый крейт с std::fs его не нарушает; architecture.md не создавался — контракт полностью зафиксирован в FR-2..FR-4."
       ]
@@ -145,10 +139,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "security.md не создан: новых прав, классов чувствительных данных и защищённых потоков (сессия/auth/лицензия/платёж) нет; модель угроз описана в разделе ФД «Данные, права, ошибки».",
         "Секретов при сверке не встречено."
@@ -159,10 +150,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "QA-001, QA-002 — NOTICE, вердикт не блокируют",
         "Ролей в крейте нет; изоляция данных (граница каталога документа) покрыта SC-002…SC-004",
@@ -198,10 +186,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "Режим дельты: правки FR-2 шаг 4, AC-1, AC-6 закрывают ARCH-001 (кандидат из компонентов шага 3) и ARCH-002 (нет родителя → Io); новых дефектов не вносят. reviews.md не менялся."
       ]
@@ -211,10 +196,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "Режим дельты (FR-2, AC-1, AC-6): сборка кандидата из компонентов шага 3 не ослабляет защиту — финальная проверка canonicalize + Path::starts_with(база) сохранена (компонент вида `C:`, заменяющий путь при push на Windows, даёт Escape). Секция reviews.md не менялась."
       ]
@@ -330,9 +312,7 @@
       "files_count": 4,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T23:15:03+00:00",
@@ -363,9 +343,7 @@
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-003"
-      ],
+      "findings": ["SEC-003"],
       "notes": [
         "cargo deny advisories не прогнан: песочница запрещает lock ~/.cargo/advisory-dbs/db.lock; у nimmd-assets нет зависимостей",
         "semgrep запущен с HOME=tmp_dir (лог ~/.semgrep запрещён песочницей), exit 0, находок нет"
@@ -659,4 +637,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

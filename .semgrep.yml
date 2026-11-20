@@ -34,8 +34,8 @@ rules:
           - pattern: $E.outerHTML = $V
           - pattern: $E["innerHTML"] = $V
           - pattern: $E["outerHTML"] = $V
-          - pattern: 'Object.assign(..., {..., innerHTML: $V, ...}, ...)'
-          - pattern: 'Object.assign(..., {..., outerHTML: $V, ...}, ...)'
+          - pattern: "Object.assign(..., {..., innerHTML: $V, ...}, ...)"
+          - pattern: "Object.assign(..., {..., outerHTML: $V, ...}, ...)"
           - pattern: $E.insertAdjacentHTML(...)
           - pattern: document.write(...)
           - pattern: document.writeln(...)

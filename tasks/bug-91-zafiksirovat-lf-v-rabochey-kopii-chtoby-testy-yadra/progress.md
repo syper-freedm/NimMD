@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "zafiksirovat-lf-v-rabochey-kopii-chtoby-testy-yadra",
   "branch": "fix/91-zafiksirovat-lf-v-rabochey-kopii-chtoby",
   "size": "S",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-26T20:40:34+00:00",
       "event": "classified",
       "size": "S",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-26T20:40:35+00:00",
@@ -147,10 +144,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "Все AC-1…AC-4 проверяемы; test-cases.md: SC-001…SC-007, каждый AC покрыт.",
         "Сверено с кодом: файлы из AC-1 есть в индексе, дамп уже i/-text; profile_matches_detect_on_fixtures читает фикстуры через fs во время теста (AC-3 достижим), CRLF строится из сырого src (document.rs:222).",
@@ -217,9 +211,7 @@
       "at": "2026-10-26T20:42:07+00:00",
       "event": "write_scope_extended",
       "phase": "backend",
-      "paths": [
-        ".gitattributes"
-      ],
+      "paths": [".gitattributes"],
       "reason": "ФД FR-1, Карта реализации"
     },
     {
@@ -267,10 +259,7 @@
       "files_count": 2,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "backend-tests",
-        "documentation"
-      ]
+      "skip": ["backend-tests", "documentation"]
     },
     {
       "at": "2026-10-26T20:44:13+00:00",
@@ -527,26 +516,16 @@
     "code-review": {
       "verdict": "APPROVED",
       "input_hash": "10670b83fdd0ab079ac39c5b07b56645235fcbda3f64d31f04b241e486f5101e",
-      "files": [
-        ".gitattributes",
-        "crates/nimmd-core/tests/document.rs"
-      ],
+      "files": [".gitattributes", "crates/nimmd-core/tests/document.rs"],
       "production_hash": "4cef74f4312b97479e035131cdf557a6cb87884d45b1bc6a177b95798dc740db",
-      "production_files": [
-        ".gitattributes"
-      ]
+      "production_files": [".gitattributes"]
     },
     "security-code-review": {
       "verdict": "APPROVED",
       "input_hash": "10670b83fdd0ab079ac39c5b07b56645235fcbda3f64d31f04b241e486f5101e",
-      "files": [
-        ".gitattributes",
-        "crates/nimmd-core/tests/document.rs"
-      ],
+      "files": [".gitattributes", "crates/nimmd-core/tests/document.rs"],
       "production_hash": "4cef74f4312b97479e035131cdf557a6cb87884d45b1bc6a177b95798dc740db",
-      "production_files": [
-        ".gitattributes"
-      ]
+      "production_files": [".gitattributes"]
     }
   },
   "accepted_code_hash": {
@@ -554,4 +533,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

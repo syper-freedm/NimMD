@@ -14,7 +14,12 @@ function prepareDocument(main: HTMLElement, windowLabel: string): void {
   for (const image of main.querySelectorAll("img")) {
     const src = image.getAttribute("src") ?? "";
     const showPlaceholder = () => {
-      showBlockMessage(image, image.alt ? `Картинка недоступна: ${image.alt}` : "Картинка недоступна.");
+      showBlockMessage(
+        image,
+        image.alt
+          ? `Картинка недоступна: ${image.alt}`
+          : "Картинка недоступна.",
+      );
       image.remove();
     };
     if (!src) {
@@ -52,11 +57,22 @@ export interface RenderedView {
   windowLabel: string;
 }
 
-export function documentFragment({ body, windowLabel }: RenderedView): HTMLElement {
+export function documentFragment({
+  body,
+  windowLabel,
+}: RenderedView): HTMLElement {
   // Ресурсы фрагмента остаются неактивными до обработки ссылок на картинки.
-  const parsed = new DOMParser().parseFromString(`<template>${body}</template>`, "text/html");
-  const content = parsed.querySelector("template")?.content.querySelector<HTMLElement>("main.nimmd");
-  if (!content) throw new Error("Не удалось показать документ. Закройте окно и откройте файл снова.");
+  const parsed = new DOMParser().parseFromString(
+    `<template>${body}</template>`,
+    "text/html",
+  );
+  const content = parsed
+    .querySelector("template")
+    ?.content.querySelector<HTMLElement>("main.nimmd");
+  if (!content)
+    throw new Error(
+      "Не удалось показать документ. Закройте окно и откройте файл снова.",
+    );
   const main = document.importNode(content, true);
   prepareDocument(main, windowLabel);
   return main;

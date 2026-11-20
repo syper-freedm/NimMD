@@ -1,21 +1,39 @@
 import { invoke } from "@tauri-apps/api/core";
-import { documentFragment, showBlockMessage, type RenderedView } from "./document-fragment";
+import {
+  documentFragment,
+  showBlockMessage,
+  type RenderedView,
+} from "./document-fragment";
 import type { Launch } from "./launch";
 
 type Block = { node: HTMLElement; source: string };
 
 interface ViewLibraries extends Window {
   katex?: {
-    render: (source: string, node: HTMLElement, options: {
-      displayMode: boolean; trust: false; throwOnError: false; errorColor: string;
-    }) => void;
+    render: (
+      source: string,
+      node: HTMLElement,
+      options: {
+        displayMode: boolean;
+        trust: false;
+        throwOnError: false;
+        errorColor: string;
+      },
+    ) => void;
   };
   mermaid?: {
     initialize: (options: {
-      securityLevel: "strict"; startOnLoad: false; layout: "dagre";
-      theme: "default" | "dark"; suppressErrorRendering: true; deterministicIds: true;
+      securityLevel: "strict";
+      startOnLoad: false;
+      layout: "dagre";
+      theme: "default" | "dark";
+      suppressErrorRendering: true;
+      deterministicIds: true;
     }) => void;
-    run: (options: { nodes: HTMLElement[]; suppressErrors: true }) => Promise<void>;
+    run: (options: {
+      nodes: HTMLElement[];
+      suppressErrors: true;
+    }) => Promise<void>;
   };
 }
 
@@ -26,16 +44,27 @@ const maxBlocks = 32;
 const maxTotalLength = 32_768;
 const documentLimit = "Превышен лимит документа для формул и диаграмм.";
 const diagramTooLong = "Диаграмма слишком длинная.";
-const viewError = "Не удалось показать документ. Закройте окно и откройте файл снова.";
+const viewError =
+  "Не удалось показать документ. Закройте окно и откройте файл снова.";
 const mathErrorColor = "var(--nimmd-katex-error)";
 
 function loadAsset(asset: HTMLLinkElement | HTMLScriptElement): Promise<void> {
   return new Promise((resolve, reject) => {
-    asset.addEventListener("load", () => { resolve(); }, { once: true });
-    asset.addEventListener("error", () => {
-      asset.remove();
-      reject(new Error("Ресурс недоступен"));
-    }, { once: true });
+    asset.addEventListener(
+      "load",
+      () => {
+        resolve();
+      },
+      { once: true },
+    );
+    asset.addEventListener(
+      "error",
+      () => {
+        asset.remove();
+        reject(new Error("Ресурс недоступен"));
+      },
+      { once: true },
+    );
     document.head.append(asset);
   });
 }
@@ -51,7 +80,11 @@ async function renderMath(blocks: Block[]): Promise<void> {
     await Promise.all([loadAsset(css), loadAsset(script)]);
     if (!libraries.katex) throw new Error("KaTeX недоступен");
   } catch {
-    for (const { node } of blocks) showBlockMessage(node, "Не удалось отрисовать формулу. Ресурс недоступен.");
+    for (const { node } of blocks)
+      showBlockMessage(
+        node,
+        "Не удалось отрисовать формулу. Ресурс недоступен.",
+      );
     return;
   }
 
@@ -65,7 +98,9 @@ async function renderMath(blocks: Block[]): Promise<void> {
         errorColor: mathErrorColor,
       });
       // KaTeX с throwOnError: false помечает неизвестные команды цветом в MathML.
-      if (output.querySelector(`.katex-error, [mathcolor="${mathErrorColor}"]`)) {
+      if (
+        output.querySelector(`.katex-error, [mathcolor="${mathErrorColor}"]`)
+      ) {
         throw new Error("Ошибка TeX");
       }
       node.replaceChildren(...output.childNodes);
@@ -80,7 +115,13 @@ async function renderDiagrams(diagrams: Block[]): Promise<void> {
   // Самозапуск Mermaid привязан к load. Подключаем скрипт после события.
   if (document.readyState !== "complete") {
     await new Promise<void>((resolve) => {
-      window.addEventListener("load", () => { resolve(); }, { once: true });
+      window.addEventListener(
+        "load",
+        () => {
+          resolve();
+        },
+        { once: true },
+      );
     });
   }
 
@@ -95,16 +136,25 @@ async function renderDiagrams(diagrams: Block[]): Promise<void> {
       securityLevel: "strict",
       startOnLoad: false,
       layout: "dagre",
-      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "default",
       suppressErrorRendering: true,
       deterministicIds: true,
     });
   } catch {
-    for (const { node } of diagrams) showBlockMessage(node, "Не удалось отрисовать диаграмму. Ресурс недоступен.");
+    for (const { node } of diagrams)
+      showBlockMessage(
+        node,
+        "Не удалось отрисовать диаграмму. Ресурс недоступен.",
+      );
     return;
   }
   try {
-    await mermaid.run({ nodes: diagrams.map(({ node }) => node), suppressErrors: true });
+    await mermaid.run({
+      nodes: diagrams.map(({ node }) => node),
+      suppressErrors: true,
+    });
   } catch {
     // Результат и исходник проверяются для каждого блока отдельно.
   }
@@ -120,14 +170,22 @@ async function renderBlocks(main: HTMLElement): Promise<void> {
   const math: Block[] = [];
   const diagrams: Block[] = [];
   let total = 0;
-  for (const node of main.querySelectorAll<HTMLElement>("[data-math-style], pre.mermaid")) {
+  for (const node of main.querySelectorAll<HTMLElement>(
+    "[data-math-style], pre.mermaid",
+  )) {
     const source = node.textContent;
     const formula = node.hasAttribute("data-math-style");
     if (source.length > (formula ? maxMathLength : maxDiagramLength)) {
-      showBlockMessage(node, formula ? "Формула слишком длинная." : diagramTooLong);
+      showBlockMessage(
+        node,
+        formula ? "Формула слишком длинная." : diagramTooLong,
+      );
       continue;
     }
-    if (math.length + diagrams.length >= maxBlocks || total + source.length > maxTotalLength) {
+    if (
+      math.length + diagrams.length >= maxBlocks ||
+      total + source.length > maxTotalLength
+    ) {
       showBlockMessage(node, documentLimit);
       continue;
     }
@@ -137,7 +195,10 @@ async function renderBlocks(main: HTMLElement): Promise<void> {
   await Promise.all([renderMath(math), renderDiagrams(diagrams)]);
 }
 
-function watchWindowErrors(root: HTMLElement, notice: HTMLElement): Promise<void> {
+function watchWindowErrors(
+  root: HTMLElement,
+  notice: HTMLElement,
+): Promise<void> {
   let generation = 0;
   async function refresh(): Promise<void> {
     const request = ++generation;
@@ -159,7 +220,9 @@ function watchWindowErrors(root: HTMLElement, notice: HTMLElement): Promise<void
     }
     notice.replaceChildren(...(errors.length ? [list] : []));
   }
-  root.addEventListener("nimmd-launch-changed", () => { void refresh(); });
+  root.addEventListener("nimmd-launch-changed", () => {
+    void refresh();
+  });
   return refresh();
 }
 
@@ -178,7 +241,12 @@ export async function showView(root: HTMLElement): Promise<void> {
     main = documentFragment(await invoke<RenderedView>("get_view"));
   } catch (error) {
     status.setAttribute("role", "alert");
-    status.textContent = typeof error === "string" ? error : error instanceof Error ? error.message : viewError;
+    status.textContent =
+      typeof error === "string"
+        ? error
+        : error instanceof Error
+          ? error.message
+          : viewError;
     await launchReady;
     return;
   }

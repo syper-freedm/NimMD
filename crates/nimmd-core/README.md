@@ -45,16 +45,16 @@ assert!(out.html.contains(&out.body));
 Все поля публичные. Хосту без JS (`assets: None`) нужен `math: MathML`: разметку для KaTeX
 без скрипта никто не отрисует.
 
-| Поле | По умолчанию | Смысл |
-|------|--------------|-------|
-| `kind` | `Markdown` | Тип файла; не `Markdown` — данные без frontmatter, профиля и скриптов |
-| `theme` | `Auto` | `Auto` по `prefers-color-scheme`, `Light`, `Dark` |
-| `assets` | `None` | KaTeX и Mermaid: `None` — без скриптов, `Link { base_url }` — `<script src>` того же origin, `Inline` — содержимое в документе |
-| `math` | `Katex` | `Katex` — разметка для KaTeX, `MathML` — без скриптов, `Source` — исходный TeX |
-| `remote_images` | `false` | `false` — `http(s)`-картинки заменяются плейсхолдером |
-| `not_utf8` | `false` | Хост заменял битые байты — показать баннер |
-| `max_bytes` | 10 МБ | Длиннее — рендерится префикс по границе символа, `truncated = true` |
-| `profile` | `None` | Переопределить детектор; `None` — профиль определяет `detect` |
+| Поле            | По умолчанию | Смысл                                                                                                                          |
+| --------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `kind`          | `Markdown`   | Тип файла; не `Markdown` — данные без frontmatter, профиля и скриптов                                                          |
+| `theme`         | `Auto`       | `Auto` по `prefers-color-scheme`, `Light`, `Dark`                                                                              |
+| `assets`        | `None`       | KaTeX и Mermaid: `None` — без скриптов, `Link { base_url }` — `<script src>` того же origin, `Inline` — содержимое в документе |
+| `math`          | `Katex`      | `Katex` — разметка для KaTeX, `MathML` — без скриптов, `Source` — исходный TeX                                                 |
+| `remote_images` | `false`      | `false` — `http(s)`-картинки заменяются плейсхолдером                                                                          |
+| `not_utf8`      | `false`      | Хост заменял битые байты — показать баннер                                                                                     |
+| `max_bytes`     | 10 МБ        | Длиннее — рендерится префикс по границе символа, `truncated = true`                                                            |
+| `profile`       | `None`       | Переопределить детектор; `None` — профиль определяет `detect`                                                                  |
 
 Файлы бандлов для `assets` собираются в `packages/vendor/dist` (`just vendor`).
 

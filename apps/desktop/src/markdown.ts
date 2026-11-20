@@ -1,9 +1,20 @@
 import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
-import { Compartment, EditorState, type Extension, type Text, type Transaction } from "@codemirror/state";
+import {
+  Compartment,
+  EditorState,
+  type Extension,
+  type Text,
+  type Transaction,
+} from "@codemirror/state";
 import { GFM, type InlineParser, type MarkdownConfig } from "@lezer/markdown";
 
-function token(name: string, marker: string, pattern: RegExp, before: string): InlineParser {
+function token(
+  name: string,
+  marker: string,
+  pattern: RegExp,
+  before: string,
+): InlineParser {
   const markerCode = marker.charCodeAt(0);
   return {
     name,
@@ -13,14 +24,23 @@ function token(name: string, marker: string, pattern: RegExp, before: string): I
 
       pattern.lastIndex = position - context.offset;
       const match = pattern.exec(context.text);
-      return match ? context.addElement(context.elt(name, position, position + match[0].length)) : -1;
+      return match
+        ? context.addElement(
+            context.elt(name, position, position + match[0].length),
+          )
+        : -1;
     },
   };
 }
 
 const nimmdMarkdown: MarkdownConfig = {
   defineNodes: [
-    "InlineMath", "DisplayMath", "WikiLink", "FootnoteReference", "FootnoteMark", "AlertMarker",
+    "InlineMath",
+    "DisplayMath",
+    "WikiLink",
+    "FootnoteReference",
+    "FootnoteMark",
+    "AlertMarker",
     {
       name: "FootnoteDefinition",
       block: true,
@@ -47,8 +67,18 @@ const nimmdMarkdown: MarkdownConfig = {
     },
   ],
   parseInline: [
-    token("DisplayMath", "$", /(?<!\$)\$\$(?!\$)(?:\\[^\n]|[^\\$]|\$(?!\$))+?\$\$(?!\$)/y, "Emphasis"),
-    token("InlineMath", "$", /(?<!\$)\$(?![\s$])(?:\\[^\n]|[^\\$])+?(?<!\s)\$(?![\d$])/y, "Emphasis"),
+    token(
+      "DisplayMath",
+      "$",
+      /(?<!\$)\$\$(?!\$)(?:\\[^\n]|[^\\$]|\$(?!\$))+?\$\$(?!\$)/y,
+      "Emphasis",
+    ),
+    token(
+      "InlineMath",
+      "$",
+      /(?<!\$)\$(?![\s$])(?:\\[^\n]|[^\\$])+?(?<!\s)\$(?![\d$])/y,
+      "Emphasis",
+    ),
     token("WikiLink", "[", /\[\[[^\][\n]+\]\]/y, "Link"),
     token("FootnoteReference", "[", /\[\^[^\s\][]+\](?!\()/y, "Link"),
   ],
@@ -59,13 +89,22 @@ const nimmdMarkdown: MarkdownConfig = {
       parse(context, line) {
         if (line.text[line.pos] !== ">") return false;
 
-        const header = /^> \[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?=[ \t]|$)/i.exec(line.text.slice(line.pos))?.[0];
+        const header =
+          /^> \[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?=[ \t]|$)/i.exec(
+            line.text.slice(line.pos),
+          )?.[0];
         if (!header) return false;
 
         const start = context.lineStart + line.pos;
         context.startComposite("Alert", line.pos);
         context.addElement(context.elt("QuoteMark", start, start + 1));
-        context.addElement(context.elt("AlertMarker", start + header.indexOf("["), start + header.length));
+        context.addElement(
+          context.elt(
+            "AlertMarker",
+            start + header.indexOf("["),
+            start + header.length,
+          ),
+        );
         line.moveBase(line.text.length);
         return null;
       },
@@ -81,7 +120,9 @@ const nimmdMarkdown: MarkdownConfig = {
 
         const start = context.lineStart + line.pos;
         context.startComposite("FootnoteDefinition", line.pos);
-        context.addElement(context.elt("FootnoteMark", start, start + marker.length));
+        context.addElement(
+          context.elt("FootnoteMark", start, start + marker.length),
+        );
         line.moveBase(line.skipSpace(line.pos + marker.length));
         return null;
       },
@@ -89,7 +130,10 @@ const nimmdMarkdown: MarkdownConfig = {
   ],
 };
 
-const markdownBody = markdown({ extensions: [GFM, nimmdMarkdown], addKeymap: false });
+const markdownBody = markdown({
+  extensions: [GFM, nimmdMarkdown],
+  addKeymap: false,
+});
 const markdownYaml = yamlFrontmatter({ content: markdownBody });
 const languageConfig = new Compartment();
 
@@ -104,18 +148,25 @@ function hasClosingDelimiter(doc: Text, first = 2, last = doc.lines): boolean {
 
 function languageFor(doc: Text) {
   // Ядро считает frontmatter только блоком между двумя полными строками ---.
-  return doc.line(1).text === "---" && hasClosingDelimiter(doc) ? markdownYaml : markdownBody;
+  return doc.line(1).text === "---" && hasClosingDelimiter(doc)
+    ? markdownYaml
+    : markdownBody;
 }
 
 function changesTouchDelimiter(transaction: Transaction): boolean {
   const { doc } = transaction.startState;
   const newDoc = transaction.newDoc;
   const touchesClosing = (text: Text, from: number, to: number) =>
-    hasClosingDelimiter(text, Math.max(2, text.lineAt(from).number), text.lineAt(to).number);
+    hasClosingDelimiter(
+      text,
+      Math.max(2, text.lineAt(from).number),
+      text.lineAt(to).number,
+    );
 
   let touched = false;
   transaction.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
-    touched ||= touchesClosing(doc, fromA, toA) || touchesClosing(newDoc, fromB, toB);
+    touched ||=
+      touchesClosing(doc, fromA, toA) || touchesClosing(newDoc, fromB, toB);
   });
   return touched;
 }
@@ -129,7 +180,10 @@ export function markdownLanguage(doc: Text): Extension {
       const doc = transaction.newDoc;
       const opensYaml = doc.line(1).text === "---";
       const openedYaml = transaction.startState.doc.line(1).text === "---";
-      if (opensYaml === openedYaml && (!opensYaml || !changesTouchDelimiter(transaction))) {
+      if (
+        opensYaml === openedYaml &&
+        (!opensYaml || !changesTouchDelimiter(transaction))
+      ) {
         return null;
       }
 

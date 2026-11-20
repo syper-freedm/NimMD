@@ -9,14 +9,24 @@ afterEach(() => {
 
 test("показывает первый кадр из Rust перед монтированием редактора", async () => {
   const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+    frames.push(callback),
+  );
   let errors: string[] = [];
-  mockIPC((command) => command === "get_launch"
-    ? { mode: "edit", path: "note.md", errors }
-    : { body: '<main class="nimmd"><h1>Первый кадр</h1></main>', windowLabel: "nimmd-window-1", source: "# Исходник" });
+  mockIPC((command) =>
+    command === "get_launch"
+      ? { mode: "edit", path: "note.md", errors }
+      : {
+          body: '<main class="nimmd"><h1>Первый кадр</h1></main>',
+          windowLabel: "nimmd-window-1",
+          source: "# Исходник",
+        },
+  );
   const root = document.createElement("div");
   const ready = showLaunch(root);
-  await vi.waitFor(() => { expect(frames).toHaveLength(1); });
+  await vi.waitFor(() => {
+    expect(frames).toHaveLength(1);
+  });
   expect(root.querySelector("main.nimmd h1")?.textContent).toBe("Первый кадр");
   expect(root.querySelector(".cm-editor")).toBeNull();
   frames.shift()?.(0);
@@ -29,14 +39,22 @@ test("показывает первый кадр из Rust перед монти
   const editor = root.querySelector(".cm-content");
   errors = ["Ошибка другого файла"];
   root.dispatchEvent(new Event("nimmd-launch-changed"));
-  await vi.waitFor(() => { expect(root.querySelector('[role="alert"]')?.textContent).toBe(errors[0]); });
+  await vi.waitFor(() => {
+    expect(root.querySelector('[role="alert"]')?.textContent).toBe(errors[0]);
+  });
   expect(root.querySelector(".cm-content")).toBe(editor);
 });
 
 test("оставляет первый кадр, когда Rust не передал редактируемый текст", async () => {
-  mockIPC((command) => command === "get_launch"
-    ? { mode: "edit", path: "note.md", errors: [] }
-    : { body: '<main class="nimmd"><p>Только чтение</p></main>', windowLabel: "nimmd-window-1", source: null });
+  mockIPC((command) =>
+    command === "get_launch"
+      ? { mode: "edit", path: "note.md", errors: [] }
+      : {
+          body: '<main class="nimmd"><p>Только чтение</p></main>',
+          windowLabel: "nimmd-window-1",
+          source: null,
+        },
+  );
   const root = document.createElement("div");
   await showLaunch(root);
   expect(root.querySelector("main.nimmd")?.textContent).toBe("Только чтение");
@@ -56,7 +74,7 @@ test("показывает режим просмотра и путь из Rust I
   expect(root.dataset.mode).toBe(mode);
   expect(root.querySelector("h1")?.textContent).toBe("Просмотр");
   expect(root.querySelector("p")?.textContent).toBe("заметка с пробелами.md");
-  expect(root.querySelector("textarea, [contenteditable]" )).toBeNull();
+  expect(root.querySelector("textarea, [contenteditable]")).toBeNull();
 });
 
 test("имя файла остаётся текстом, даже если содержит HTML", async () => {
@@ -76,7 +94,9 @@ test("пустой запуск сообщает, что файл не выбр�
 });
 
 test("ошибка IPC видна пользователю", async () => {
-  mockIPC(() => { throw new Error("IPC недоступен"); });
+  mockIPC(() => {
+    throw new Error("IPC недоступен");
+  });
   const root = document.createElement("main");
   await showLaunch(root);
   expect(root.getAttribute("role")).toBe("alert");
@@ -84,7 +104,8 @@ test("ошибка IPC видна пользователю", async () => {
 });
 
 test("показывает ошибку открытия, сохраняя путь и режим окна", async () => {
-  const error = 'Не удалось открыть «<img src=x onerror=alert(1)>». Выберите файл.';
+  const error =
+    "Не удалось открыть «<img src=x onerror=alert(1)>». Выберите файл.";
   mockIPC(() => ({ mode: "view", path: "note.md", errors: [error] }));
   const root = document.createElement("main");
   await showLaunch(root);
@@ -102,7 +123,14 @@ test("загруженное окно показывает новую ошибк
   errors = ["Выберите файл.", "Проверьте, что файл существует."];
   root.dispatchEvent(new Event("nimmd-launch-changed"));
   await vi.waitFor(() => {
-    expect(Array.from(root.querySelectorAll('[role="alert"] li'), (item) => item.textContent)).toEqual(errors);
+    expect(
+      Array.from(
+        root.querySelectorAll('[role="alert"] li'),
+        (item) => item.textContent,
+      ),
+    ).toEqual(errors);
   });
-  expect(root.querySelector(".document-path")?.textContent).toBe("Файл не выбран");
+  expect(root.querySelector(".document-path")?.textContent).toBe(
+    "Файл не выбран",
+  );
 });

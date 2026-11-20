@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | done |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | done         |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "realizovat-tipy-profilya-i-predobrabotku-teksta",
   "branch": "feat/39-realizovat-tipy-profilya-i-predobrabotku",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-24T21:25:54+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-24T21:25:54+00:00",
@@ -132,10 +129,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "Карта ложится на пустой крейт nimmd-core (lib.rs только с forbid(unsafe_code)); дублей strip_bom/split_frontmatter/Dialect в отслеживаемом коде нет (git grep).",
         "serde с derive уже в [workspace.dependencies]; инвариант semgrep nimmd-core-no-io не затрагивается.",
@@ -147,10 +141,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "Чистый библиотечный API без ввода-вывода, прав и чувствительных данных: security.md не нужен.",
         "Тотальность функций и линейная сложность заявлены в ФД; MAX_BYTES ограничивает вход от недоверенного файла Quick Look.",
@@ -162,10 +153,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "QA-001, QA-002 — NOTICE, правка ФД не нужна: FR-9, Display/Error у UnknownDialect и тотальность без AC закрыты сценариями SC-003, SC-010, SC-011; составные AC-1/AC-2 разнесены по сценариям.",
         "Ожидания AC-2…AC-6 пересчитаны по FR-4…FR-8 вручную — расхождений нет.",
@@ -275,9 +263,7 @@
       "files_count": 5,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-24T21:32:29+00:00",
@@ -295,9 +281,7 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-003"
-      ],
+      "findings": ["ARCH-003"],
       "notes": [
         "cargo fmt --check и cargo clippy --workspace --all-targets -D warnings зелёные; .gitignore изменён вне changed-files.txt (NOTICE ARCH-003)"
       ]
@@ -616,4 +600,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "zavendorit-katex-i-mermaid-bez-elkjs",
   "branch": "chore/42-zavendorit-katex-i-mermaid-bez-elkjs",
   "size": "S",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-25T09:27:36+00:00",
       "event": "classified",
       "size": "S",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T09:28:20+00:00",
@@ -132,9 +129,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "Сверено с кодом: justfile (lint, npm-licenses уже вызывает packages/vendor), ci.yml job lint, .gitignore (node_modules/ уже игнорируется), .semgrep.yml (исключение /packages/vendor/** уже есть), scripts/check-npm-licenses.mjs; дублей packages/vendor нет.",
         "Не проверено: что mermaid 12.2.0 действительно тянет elkjs и что штатный mermaid.min.js содержит org.eclipse.elk (AC-2, размерная проверка FR-4) — node_modules в дереве нет.",
@@ -156,9 +151,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001"
-      ],
+      "findings": ["QA-001"],
       "notes": [
         "Все AC-1..AC-5 проверяемы; QA-001 (NOTICE, AC-2): уточнить, что бандл грузится в vm.createContext({}) без исключения",
         "Сверено с кодом: justfile npm-licenses уже проверяет packages/vendor, .semgrep.yml исключает /packages/vendor/**, node_modules/ в .gitignore, в ci.yml job lint pnpm пока не ставится",
@@ -229,10 +222,7 @@
       "at": "2026-10-25T09:30:28+00:00",
       "event": "write_scope_extended",
       "phase": "backend",
-      "paths": [
-        "packages/vendor/",
-        ".gitignore"
-      ],
+      "paths": ["packages/vendor/", ".gitignore"],
       "reason": "Карта реализации FR-1–FR-6: packages/vendor и .gitignore"
     },
     {
@@ -279,10 +269,7 @@
       "files_count": 12,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "backend-tests",
-        "documentation"
-      ]
+      "skip": ["backend-tests", "documentation"]
     },
     {
       "at": "2026-10-25T09:34:07+00:00",
@@ -633,4 +620,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

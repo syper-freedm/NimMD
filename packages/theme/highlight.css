@@ -31,10 +31,27 @@
   --hl-variable: #ffa657;
 }
 
-.comment { color: var(--hl-comment); font-style: italic; }
-.keyword, .storage { color: var(--hl-keyword); }
-.string { color: var(--hl-string); }
-.constant, .support { color: var(--hl-constant); }
-.entity { color: var(--hl-entity); }
-.entity.tag { color: var(--hl-tag); }
-.variable { color: var(--hl-variable); }
+.comment {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+.keyword,
+.storage {
+  color: var(--hl-keyword);
+}
+.string {
+  color: var(--hl-string);
+}
+.constant,
+.support {
+  color: var(--hl-constant);
+}
+.entity {
+  color: var(--hl-entity);
+}
+.entity.tag {
+  color: var(--hl-tag);
+}
+.variable {
+  color: var(--hl-variable);
+}

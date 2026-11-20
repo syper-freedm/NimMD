@@ -24,7 +24,11 @@ async function openEditor(content: HTMLElement): Promise<void> {
 
     // Между двумя callback WebView успевает показать HTML ядра.
     await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => { requestAnimationFrame(() => { resolve(); }); });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      });
     });
     const { mountEditor } = await import("./editor");
     const editorRoot = document.createElement("div");
@@ -34,7 +38,10 @@ async function openEditor(content: HTMLElement): Promise<void> {
     editor.focus();
   } catch (error) {
     status.setAttribute("role", "alert");
-    status.textContent = typeof error === "string" ? error : "Не удалось открыть редактор. Закройте окно и откройте файл снова.";
+    status.textContent =
+      typeof error === "string"
+        ? error
+        : "Не удалось открыть редактор. Закройте окно и откройте файл снова.";
     content.append(status);
   }
 }
@@ -52,7 +59,8 @@ export async function showLaunch(root: HTMLElement): Promise<void> {
       if (request !== generation) return;
 
       const heading = document.createElement("h1");
-      heading.textContent = launch.mode === "view" ? "Просмотр" : "Редактирование";
+      heading.textContent =
+        launch.mode === "view" ? "Просмотр" : "Редактирование";
       const path = document.createElement("p");
       path.className = "document-path";
       path.textContent = launch.path ?? "Файл не выбран";
@@ -76,7 +84,8 @@ export async function showLaunch(root: HTMLElement): Promise<void> {
       }
     } catch {
       if (request !== generation) return;
-      const error = "Не удалось получить параметры запуска. Перезапустите NimMD.";
+      const error =
+        "Не удалось получить параметры запуска. Перезапустите NimMD.";
       if (opening) {
         const warning = document.createElement("p");
         warning.setAttribute("role", "alert");
@@ -89,6 +98,8 @@ export async function showLaunch(root: HTMLElement): Promise<void> {
     }
   }
 
-  root.addEventListener("nimmd-launch-changed", () => { void refresh(); });
+  root.addEventListener("nimmd-launch-changed", () => {
+    void refresh();
+  });
   await refresh();
 }

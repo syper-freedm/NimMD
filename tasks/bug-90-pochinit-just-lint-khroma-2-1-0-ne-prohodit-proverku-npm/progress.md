@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | done |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | done         |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -40,7 +40,7 @@
 
 - 2026-10-26T20:32:46+00:00 `handback_accepted` — {"phase": "code-review", "verdict": "APPROVED", "findings": [], "notes": ["reconcile() прогнан на входах AC-1…AC-5 — результаты совпадают с ожиданиями (префикс каталога добавляет check, как в ARCH-001).", "node scripts/check-npm-licenses.mjs packages/vendor — exit 0; node --test scripts/*.test.mjs — fail 0.", "Тесты reconcile в scripts/check-npm-licenses.test.mjs в диффе пока нет — их добавляет QA/тест-фаза по карте реализации."]}
 - 2026-10-26T20:32:46+00:00 `handback_accepted` — {"phase": "security-code-review", "verdict": "APPROVED", "findings": [], "notes": ["cargo deny check advisories запущен вне песочницы: в песочнице нет записи в ~/.cargo/advisory-dbs/db.lock", "semgrep запущен с SEMGREP_LOG_FILE в control/.tmp/security-code-review: в песочнице нет записи в ~/.semgrep"]}
-- 2026-10-26T20:32:46+00:00 `handback_accepted` — {"phase": "backend-tests", "verdict": "BLOCKED", "findings": [], "notes": ["Нужен доступ на запись к scripts/check-npm-licenses.test.mjs (context --allow-path scripts/check-npm-licenses.test.mjs). Без него тесты не написать: write_scope пакета — crates/, apps/desktop/src-tauri/, fuzz/ (test_paths области backend), а правка (scripts/check-npm-licenses.mjs) — это Node-скрипт. Существующие тесты к нему лежат в scripts/check-npm-licenses.test.mjs (node --test scripts/*.test.mjs, его вызывает just test).", "План после выдачи доступа: unit-тесты reconcile() для SC-001..SC-005 в существующем файле scripts/check-npm-licenses.test.mjs (сверка числа нарушений и окончания строк по ARCH-001/QA-001); проверка red-before-fix через git stash скрипта; затем node --test scripts/*.test.mjs, cargo test --workspace --all-targets и запись suite-run.", "SC-006..SC-008 (E2E/integration: just npm-licenses, just lint, pnpm licenses list) — это прогоны рецептов, а не тест-файлы; их выполняет QA на фазе testing.", "Ничего не менял и не запускал: файлов не трогал, suite-run.backend-tests.json не записан."]}
+- 2026-10-26T20:32:46+00:00 `handback_accepted` — {"phase": "backend-tests", "verdict": "BLOCKED", "findings": [], "notes": ["Нужен доступ на запись к scripts/check-npm-licenses.test.mjs (context --allow-path scripts/check-npm-licenses.test.mjs). Без него тесты не написать: write_scope пакета — crates/, apps/desktop/src-tauri/, fuzz/ (test_paths области backend), а правка (scripts/check-npm-licenses.mjs) — это Node-скрипт. Существующие тесты к нему лежат в scripts/check-npm-licenses.test.mjs (node --test scripts/_.test.mjs, его вызывает just test).", "План после выдачи доступа: unit-тесты reconcile() для SC-001..SC-005 в существующем файле scripts/check-npm-licenses.test.mjs (сверка числа нарушений и окончания строк по ARCH-001/QA-001); проверка red-before-fix через git stash скрипта; затем node --test scripts/_.test.mjs, cargo test --workspace --all-targets и запись suite-run.", "SC-006..SC-008 (E2E/integration: just npm-licenses, just lint, pnpm licenses list) — это прогоны рецептов, а не тест-файлы; их выполняет QA на фазе testing.", "Ничего не менял и не запускал: файлов не трогал, suite-run.backend-tests.json не записан."]}
 - 2026-10-26T20:32:47+00:00 `write_scope_extended` — {"phase": "backend-tests", "paths": ["scripts/check-npm-licenses.test.mjs"], "reason": "ФД «Карта реализации»: новые тесты в scripts/check-npm-licenses.test.mjs"}
 - 2026-10-26T20:32:47+00:00 `note` — {"text": "backend-tests BLOCKED: нет доступа к scripts/*.test.mjs — выдан грант, повторный диспатч"}
 - 2026-10-26T20:35:22+00:00 `handback_accepted` — {"phase": "backend-tests", "verdict": "DONE", "findings": [], "notes": ["Покрытие: SC-001..SC-005 — тесты «SC-001: уточнение закрывает Unknown», «SC-002: новая версия снова на проверку», «SC-003: уточнение при известной лицензии считается использованным», «SC-004: уточнение не обходит белый список», «SC-005: без уточнений поведение прежнее» в scripts/check-npm-licenses.test.mjs; плюс граничный тест «уточнение одной версии не закрывает соседнюю, пустой вывод pnpm оставляет уточнение неиспользованным».", "ARCH-001/QA-001: reconcile возвращает нарушения без префикса каталога (его добавляет check); тесты сверяют число нарушений и окончание строки через endsWith, unused — точным списком.", "Красный до правки: git stash push -- scripts/check-npm-licenses.mjs; node --test scripts/check-npm-licenses.test.mjs -> 'SyntaxError: ... does not provide an export named reconcile', fail 1; git stash pop; git diff --stat идентичен до/после. Функция новая, поэтому красный прогон без правки возможен только на отсутствующем экспорте.", "Поэтому дополнительно мутационные прогоны на копиях скрипта в control/.tmp/backend-tests (production не трогался): A) уточнения игнорируются (старое поведение) -> падают SC-001, SC-003, SC-004 и граничный, ключевая строка 'AssertionError: Expected values to be strictly deep-equal: + unused: [ khroma@2.1.0 ]'; B) уточнение обходит белый список -> падает SC-004; C) used считается только для Unknown -> падает SC-003; D) версии склеены через запятую (старый формат) -> падают SC-004 ('actual: 1, expected: 2') и граничный.", "Зелёные прогоны: node --test scripts/*.test.mjs — tests 8, pass 8, fail 0, skipped 0; cargo test --workspace --all-targets — все test result ok, 0 failed (единственный ignored — существующий render_one_mib_within_budget, не относится к правке).", "diff-lint.sh backend: no changed files (Rust не менялся); semgrep --config .semgrep.yml по тестовому файлу — 0 находок (вне sandbox-лога: SEMGREP_LOG_FILE в $TMPDIR, т.к. ~/.semgrep/semgrep.log недоступен песочнице). Полный just lint не запускался (нужна сеть и npm-реестр) — это SC-006..SC-008, за QA.", "QA-002 (CLI-путь FR-3: stderr + код 1 и текст «Уточнения без совпадения…») unit-тестами не покрыт: check не экспортирован и вызывает pnpm; косвенно — SC-002 через список unused."]}
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "pochinit-just-lint-khroma-2-1-0-ne-prohodit-proverku-npm",
   "branch": "fix/90-pochinit-just-lint-khroma-2-1-0-ne",
   "size": "S",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-26T20:27:46+00:00",
       "event": "classified",
       "size": "S",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-26T20:27:46+00:00",
@@ -127,9 +124,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "architecture.md не создан: долгоживущего решения нет, правка внутри одного infra-скрипта."
       ]
@@ -149,10 +144,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "AC-1…AC-5 проверяемы unit-тестами node --test в scripts/check-npm-licenses.test.mjs (файл и функции isAllowed/allowedLicenses существуют, just test запускает scripts/*.test.mjs).",
         "QA-001 NOTICE: строки нарушений в AC без префикса каталога из FR-2; сценарии сверяют окончание строки и число нарушений.",
@@ -259,10 +251,7 @@
       "files_count": 1,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "backend-tests",
-        "documentation"
-      ]
+      "skip": ["backend-tests", "documentation"]
     },
     {
       "at": "2026-10-26T20:30:57+00:00",
@@ -315,9 +304,7 @@
       "at": "2026-10-26T20:32:47+00:00",
       "event": "write_scope_extended",
       "phase": "backend-tests",
-      "paths": [
-        "scripts/check-npm-licenses.test.mjs"
-      ],
+      "paths": ["scripts/check-npm-licenses.test.mjs"],
       "reason": "ФД «Карта реализации»: новые тесты в scripts/check-npm-licenses.test.mjs"
     },
     {
@@ -571,24 +558,16 @@
     "code-review": {
       "verdict": "APPROVED",
       "input_hash": "843d56c6e0990085e7f48507a9d0a47068de76d4fc90abec412fcb1b8bec3f89",
-      "files": [
-        "scripts/check-npm-licenses.mjs"
-      ],
+      "files": ["scripts/check-npm-licenses.mjs"],
       "production_hash": "843d56c6e0990085e7f48507a9d0a47068de76d4fc90abec412fcb1b8bec3f89",
-      "production_files": [
-        "scripts/check-npm-licenses.mjs"
-      ]
+      "production_files": ["scripts/check-npm-licenses.mjs"]
     },
     "security-code-review": {
       "verdict": "APPROVED",
       "input_hash": "843d56c6e0990085e7f48507a9d0a47068de76d4fc90abec412fcb1b8bec3f89",
-      "files": [
-        "scripts/check-npm-licenses.mjs"
-      ],
+      "files": ["scripts/check-npm-licenses.mjs"],
       "production_hash": "843d56c6e0990085e7f48507a9d0a47068de76d4fc90abec412fcb1b8bec3f89",
-      "production_files": [
-        "scripts/check-npm-licenses.mjs"
-      ]
+      "production_files": ["scripts/check-npm-licenses.mjs"]
     }
   },
   "write_scope_extensions": {
@@ -605,4 +584,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

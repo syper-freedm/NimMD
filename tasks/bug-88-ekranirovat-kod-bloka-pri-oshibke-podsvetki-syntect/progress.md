@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,7 +57,8 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
-```json
+
+````json
 {
   "repo": "syper-freedm/NimMD",
   "issue": 88,
@@ -65,9 +66,7 @@
   "slug": "ekranirovat-kod-bloka-pri-oshibke-podsvetki-syntect",
   "branch": "fix/88-ekranirovat-kod-bloka-pri-oshibke",
   "size": "S",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-25T21:41:39+00:00",
       "event": "classified",
       "size": "S",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T21:41:39+00:00",
@@ -132,9 +129,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "Утверждения ФД сверены с comrak 0.56 src/plugins/syntect.rs: при Err адаптер пишет code без экранирования, выбор грамматики и теги pre/code совпадают с FR-1; html::escape экранирует \" & < > как в AC-1.",
         "Cargo.lock: syntect 5.3.0 один экземпляр; highlight_yaml вызывается только из document.rs.",
@@ -146,9 +141,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "Сверено с comrak-0.56.0/src/plugins/syntect.rs: Err(_) => output.write_str(code) пишет сырой текст — дефект подтверждён; ClassedHTMLGenerator syntect 5.3 экранирует текст, html::write_opening_tag экранирует значения атрибутов.",
         "security.md не создан: новых прав, классов чувствительных данных и защищённых потоков нет."
@@ -159,10 +152,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "Все AC-1..AC-4 проверяемы; утверждения ФД сверены с кодом: SyntectAdapter в render.rs:9,255 (plugins() и highlight_yaml), comrak 0.56 при Err пишет code без экранирования (plugins/syntect.rs:104), html::escape экранирует \" & < > -> ожидание AC-1 верно, syntect 5.3.0 в Cargo.lock, syntect::Error::Fmt конструируется для подставного Err",
         "QA-001 NOTICE: функция FR-2 приватна — SC-001/SC-002 как unit-тест #[cfg(test)] в render.rs",
@@ -286,9 +276,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "Режим дельты (FR-1, AC-3): сверено с comrak 0.56 src/plugins/syntect.rs — SyntectAdapter::new(None) пишет <pre class=\"syntax-highlighting\"> без атрибутов comrak, write_code_tag идёт через html::write_opening_tag; при github_pre_lang = true (parse.rs:30) язык уходит в атрибуты pre и отбрасывается, <code> без класса. Новая редакция FR-1/AC-3 совпадает с поведением до правки.",
         "Секция reviews.md не менялась; ARCH-001 (NOTICE) остаётся в силе."
@@ -299,9 +287,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "Дельта FR-1/AC-3 сужает поверхность: write_pre_tag без атрибутов comrak (lang при github_pre_lang в разметку не попадает), write_code_tag через html::write_opening_tag — риск SEC-001 снят; секция reviews.md оставлена без изменений."
       ]
@@ -398,9 +384,7 @@
       "files_count": 5,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T21:51:00+00:00",
@@ -430,9 +414,7 @@
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-002"
-      ],
+      "findings": ["SEC-002"],
       "notes": [
         "SAST: semgrep.dev недоступен, p/rust/p/typescript/p/javascript/p/secrets не загружены — прогнан только .semgrep.yml (0 находок)",
         "cargo deny advisories и semgrep запускались вне песочницы: sandbox запрещал запись в ~/.cargo/advisory-dbs/db.lock и ~/.semgrep/semgrep.log"
@@ -723,5 +705,6 @@
     "testing": "1e23cb2246f8f4b6f2002669270559589703f6ed1712fa1d7a6368edbf444920"
   }
 }
-```
+````
+
 <!-- afd-state-snapshot:end -->

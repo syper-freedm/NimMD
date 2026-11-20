@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | done |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | done         |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "obrezat-bolshie-fayly-i-proverit-skorost-rendera",
   "branch": "feat/45-obrezat-bolshie-fayly-i-proverit-skorost",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-26T19:55:21+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-26T19:55:21+00:00",
@@ -131,9 +128,7 @@
       "at": "2026-10-26T19:55:22+00:00",
       "event": "write_scope_extended",
       "phase": "backend",
-      "paths": [
-        "CLAUDE.md"
-      ],
+      "paths": ["CLAUDE.md"],
       "reason": "Карта реализации: строка порога и just bench-check"
     },
     {
@@ -141,10 +136,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ]
+      "findings": ["ARCH-001", "ARCH-002"]
     },
     {
       "at": "2026-10-26T19:58:22+00:00",
@@ -161,10 +153,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "Все AC-1…AC-7 проверяемы; test-cases.md: SC-001…SC-013, каждый AC покрыт.",
         "QA-001 и QA-002 — NOTICE: место и число баннера лимита Markdown (FR-5); сообщение о провале и запасное значение NIMMD_BENCH_FACTOR (FR-7) без AC.",
@@ -242,10 +231,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "Дельта AC-2 (обёртка <pre class=\"syntax-highlighting\"><code> без класса языка) сверена с crates/nimmd-core/tests/render.rs:58-81 и parse.rs:30 (github_pre_lang = true); новых находок нет, reviews.md не менялся."
       ]
@@ -315,9 +301,7 @@
       "files_count": 13,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-26T20:08:23+00:00",
@@ -335,9 +319,7 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-003"
-      ],
+      "findings": ["ARCH-003"],
       "notes": [
         "Diff of 13 files from changed-files.txt matches git status; each file traces to FR-1..FR-7 / the implementation map.",
         "cargo clippy -p nimmd-core --all-targets --offline -- -D warnings: clean.",
@@ -699,4 +681,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

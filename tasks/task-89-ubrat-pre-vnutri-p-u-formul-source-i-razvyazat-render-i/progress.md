@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.frontend | not_required |
-| implementation.backend_tests | done |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.frontend       | not_required |
+| implementation.backend_tests  | done         |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "ubrat-pre-vnutri-p-u-formul-source-i-razvyazat-render-i",
   "branch": "chore/89-ubrat-pre-vnutri-p-u-formul-source-i",
   "size": "S",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-25T22:10:59+00:00",
       "event": "classified",
       "size": "S",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T22:11:00+00:00",
@@ -156,9 +153,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001"
-      ],
+      "findings": ["QA-001"],
       "notes": [
         "Все AC-1..AC-5 наблюдаемы и детерминированы; утверждения ФД сверены с render.rs:19,140, lib.rs:12, CONTRACT.md, tests/document.rs (math_source_mode, class_contract, contract_core_classes_appear_in_output).",
         "QA-001 (NOTICE): contract_core_classes_appear_in_output проверяет жёсткий список, math-display нужно проверить явно (SC-001).",
@@ -265,9 +260,7 @@
       "files_count": 6,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T22:15:32+00:00",
@@ -297,9 +290,7 @@
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001"
-      ],
+      "findings": ["SEC-001"],
       "notes": [
         "semgrep по изменённым исходникам: 0 находок; gitleaks по changed-files.txt: no leaks; cargo deny bans/licenses/sources: ok",
         "SEC-001 NOTICE: cargo deny advisories не отработал (песочница: read-only lock ~/.cargo/advisory-dbs/db.lock); зависимости не менялись"
@@ -590,4 +581,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

@@ -24,7 +24,7 @@ just desktop-check # cargo check приложения и сборка frontend
 
 ## Приложение
 
-Для приложения нужны Rust 1.90 или новее, Node.js 26, pnpm 12.18.0 и
+Для приложения нужны Rust 1.90 или новее, Node.js 26, pnpm 12.21.0 и
 [инструменты сборки Tauri для macOS](https://v2.tauri.app/start/prerequisites/#macos).
 Закреплены Tauri 2.12.7 и tauri-build 2.7.6. Для workspace, ядра и nimmd-assets
 сохранён объявленный MSRV 1.85. TypeScript 6.0.3 совместим с текущим typescript-eslint;

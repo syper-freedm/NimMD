@@ -38,14 +38,34 @@
   --csv-delim: #9198a1;
 }
 
-[data-kind="text"] pre.data { white-space: pre-wrap; }
+[data-kind="text"] pre.data {
+  white-space: pre-wrap;
+}
 
-.c0 { color: var(--csv-0); }
-.c1 { color: var(--csv-1); }
-.c2 { color: var(--csv-2); }
-.c3 { color: var(--csv-3); }
-.c4 { color: var(--csv-4); }
-.c5 { color: var(--csv-5); }
-.c6 { color: var(--csv-6); }
-.c7 { color: var(--csv-7); }
-.d { color: var(--csv-delim); }
+.c0 {
+  color: var(--csv-0);
+}
+.c1 {
+  color: var(--csv-1);
+}
+.c2 {
+  color: var(--csv-2);
+}
+.c3 {
+  color: var(--csv-3);
+}
+.c4 {
+  color: var(--csv-4);
+}
+.c5 {
+  color: var(--csv-5);
+}
+.c6 {
+  color: var(--csv-6);
+}
+.c7 {
+  color: var(--csv-7);
+}
+.d {
+  color: var(--csv-delim);
+}

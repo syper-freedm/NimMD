@@ -40,12 +40,12 @@ minisign. В v1 публикуется только macOS-артефакт и `l
 
 ### Option A: ad-hoc, без автообновления
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low |
-| Cost | 0 |
-| Scalability | Один пользователь — автор |
-| Team familiarity | Высокая |
+| Dimension        | Assessment                |
+| ---------------- | ------------------------- |
+| Complexity       | Low                       |
+| Cost             | 0                         |
+| Scalability      | Один пользователь — автор |
+| Team familiarity | Высокая                   |
 
 **Pros:** ничего лишнего в v1.
 **Cons:** этап 8 откладывается без необходимости; обновлять Quick Look-плагин
@@ -53,12 +53,12 @@ minisign. В v1 публикуется только macOS-артефакт и `l
 
 ### Option B: Developer ID + нотаризация в v1
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Med — сертификат, `notarytool`, секреты CI, stapler |
-| Cost | Подписка Apple Developer, ежегодно |
-| Scalability | Любой пользователь, скачивание из браузера |
-| Team familiarity | Средняя; `tauri-action` умеет это из коробки |
+| Dimension        | Assessment                                          |
+| ---------------- | --------------------------------------------------- |
+| Complexity       | Med — сертификат, `notarytool`, секреты CI, stapler |
+| Cost             | Подписка Apple Developer, ежегодно                  |
+| Scalability      | Любой пользователь, скачивание из браузера          |
+| Team familiarity | Средняя; `tauri-action` умеет это из коробки        |
 
 **Pros:** можно дать ссылку кому угодно; TCC-разрешения и подпись стабильны
 между сборками.
@@ -67,12 +67,12 @@ minisign. В v1 публикуется только macOS-артефакт и `l
 
 ### Option C: ad-hoc, автообновление остаётся, CI готов к Developer ID (выбрано)
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low–Med — пайплайн пишется один раз с условными шагами |
-| Cost | 0 сейчас; подписка — когда появится внешний пользователь |
-| Scalability | Автор сейчас; переход к B без изменений кода |
-| Team familiarity | Высокая |
+| Dimension        | Assessment                                               |
+| ---------------- | -------------------------------------------------------- |
+| Complexity       | Low–Med — пайплайн пишется один раз с условными шагами   |
+| Cost             | 0 сейчас; подписка — когда появится внешний пользователь |
+| Scalability      | Автор сейчас; переход к B без изменений кода             |
+| Team familiarity | Высокая                                                  |
 
 **Pros:** этап 8 не откладывается; Quick Look-плагин обновляется с
 приложением; переход к распространению — добавить секреты.
@@ -103,13 +103,13 @@ Quick Look-плагина, который иначе пришлось бы пр�
 ## Action Items
 
 1. [ ] `scripts/sign-macos.sh`: ad-hoc по умолчанию, Developer ID при
-   наличии `APPLE_SIGNING_IDENTITY`.
+       наличии `APPLE_SIGNING_IDENTITY`.
 2. [ ] GitHub Actions: `just build-macos` (спека 5.5; `tauri-action` не
-   используется — не собирает appex, К8), шаг нотаризации под условием
-   наличия секретов `APPLE_CERTIFICATE`, `APPLE_ID`, `APPLE_PASSWORD`,
-   `APPLE_TEAM_ID`; tarball, minisign-подпись и `.dmg` — после финального
-   `codesign`.
+       используется — не собирает appex, К8), шаг нотаризации под условием
+       наличия секретов `APPLE_CERTIFICATE`, `APPLE_ID`, `APPLE_PASSWORD`,
+       `APPLE_TEAM_ID`; tarball, minisign-подпись и `.dmg` — после финального
+       `codesign`.
 3. [ ] Этап 8: тест обновления на macOS 15+ — обновлённый бандл
-   запускается без диалога Gatekeeper, appex перерегистрирован.
+       запускается без диалога Gatekeeper, appex перерегистрирован.
 4. [ ] README: раздел «Установка на другой Mac» с шагом «Всё равно открыть»,
-   пока нет нотаризации.
+       пока нет нотаризации.

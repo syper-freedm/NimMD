@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,7 +57,8 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
-```json
+
+````json
 {
   "repo": "syper-freedm/NimMD",
   "issue": 41,
@@ -65,9 +66,7 @@
   "slug": "realizovat-render-markdown-cherez-comrak",
   "branch": "feat/41-realizovat-render-markdown-cherez-comrak",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-25T12:02:59+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T12:03:00+00:00",
@@ -138,9 +135,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "Сверено с comrak 0.56.0: имена опций FR-2, SyntectAdapterBuilder::css, dangerous_url (FR-3), alert_start только пяти типов (AC-4), Send+Sync у адаптеров и Options (OnceLock реализуем). Существующие тесты limit_nesting правилу FR-7(а) не противоречат."
       ]
@@ -150,10 +145,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "comrak 0.56: raw HTML escaping requires render.escape = true, absent from FR-2",
         "security.md not created: no new permissions, sensitive data or protected flow"
@@ -164,12 +156,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "BLOCKER",
-      "findings": [
-        "QA-001",
-        "QA-002",
-        "QA-003",
-        "QA-004"
-      ],
+      "findings": ["QA-001", "QA-002", "QA-003", "QA-004"],
       "notes": [
         "QA-001 BLOCKER: comrak 0.56 при unsafe_=false и render.escape=false пишет <!-- raw HTML omitted --> (html.rs render_html_block/render_html_inline), а не &lt; — AC-7 (а),(б) противоречит FR-2/FR-3; исправление — render.escape = true в FR-2",
         "QA-002..QA-004 NOTICE: FR-2/FR-3 без AC (description_lists, header_ids, multiline_block_quotes, vbscript:/file:/автоссылки); FR-7(б) ломает инвариант теста limit_nesting_is_lossless_and_idempotent (tests/text.rs:323); тайминг 1 с в debug на CI",
@@ -205,9 +192,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001"
-      ],
+      "findings": ["ARCH-001"],
       "notes": [
         "Режим дельты: FR-2, FR-3, FR-7, AC-7, AC-11 — правки закрывают QA-001/QA-002/QA-003/SEC-001, новых архитектурных дефектов не вносят; render.escape есть в comrak 0.56 (options.rs:1145). Секция reviews.md оставлена без изменений."
       ]
@@ -217,10 +202,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "Дельта FR-2/FR-3/AC-7/AC-11/FR-7 проверена: render.escape = true (есть в comrak 0.56, html.rs:684/733) закрывает SEC-001, AC-7 расширен на vbscript:/file:/автоссылки, AC-11 и инвариант FR-7 новых дыр не открывают. reviews.md не менялся."
       ]
@@ -230,10 +212,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-004",
-        "QA-005"
-      ],
+      "findings": ["QA-004", "QA-005"],
       "notes": [
         "Дельта FR-2/FR-3/FR-7/AC-7/AC-11 закрывает QA-001 (render.escape = true, поле есть в comrak 0.56 options.rs:1145), QA-002 (AC-7 (в) и AC-11), QA-003 (новый инвариант limit_nesting)",
         "dangerous_url comrak 0.56 (scanners.re:372-373, re2c '...' — без учёта регистра) подтверждает FR-3",
@@ -342,9 +321,7 @@
       "files_count": 8,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T12:14:54+00:00",
@@ -362,9 +339,7 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-002"],
       "notes": [
         "clippy -D warnings и cargo test -p nimmd-core зелёные; смоук AC-1..AC-11 во временном крейте подтвердил поведение",
         "tests/render_fragment.rs и insta-снапшоты из карты реализации в правке пока отсутствуют — их пишет тестовая фаза"
@@ -375,10 +350,7 @@
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-003",
-        "SEC-004"
-      ],
+      "findings": ["SEC-003", "SEC-004"],
       "notes": [
         "cargo deny check: advisories ok, bans ok, licenses ok, sources ok (run outside sandbox: ~/.cargo/advisory-dbs lock is read-only in sandbox)",
         "gitleaks dir over changed-files.txt: no leaks found",
@@ -721,5 +693,6 @@
     "testing": "35dd9a491744673ff2bc131c3b4768caef12377729502da995fac8bbe54c43fa"
   }
 }
-```
+````
+
 <!-- afd-state-snapshot:end -->

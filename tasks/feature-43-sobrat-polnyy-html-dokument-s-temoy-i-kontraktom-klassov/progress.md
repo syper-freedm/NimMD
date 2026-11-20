@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "sobrat-polnyy-html-dokument-s-temoy-i-kontraktom-klassov",
   "branch": "feat/43-sobrat-polnyy-html-dokument-s-temoy-i",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -106,9 +105,7 @@
       "at": "2026-10-25T12:33:51+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T12:33:51+00:00",
@@ -138,11 +135,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002",
-        "ARCH-003"
-      ],
+      "findings": ["ARCH-001", "ARCH-002", "ARCH-003"],
       "notes": [
         "Сверено с кодом: ast_features уже pub(crate) в detect.rs, parse::options() общий, Profile имеет Serialize, latex2mathml есть в [workspace.dependencies]; comrak 0.56 даёт create_formatter! с format_document_with_plugins для FR-6/FR-7.",
         "Не проверено: экранирует ли latex2mathml \\text{<script>} и паникует ли на битом TeX (исходника нет в реестре) — это зона ИБ/QA, FR-7 требование сформулировано явно.",
@@ -154,10 +147,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "BLOCKER",
-      "findings": [
-        "SEC-001",
-        "SEC-002"
-      ],
+      "findings": ["SEC-001", "SEC-002"],
       "notes": [
         "SEC-001: FR-6 prefix check is bypassed by scheme-without-slashes URLs (https:host/p.png); WHATWG URL parsing turns them into remote requests.",
         "SEC-002: latex2mathml source was not available locally, so its escaping and recursion depth are not verified.",
@@ -170,9 +160,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001"
-      ],
+      "findings": ["QA-001"],
       "notes": [
         "Все AC-1…AC-10 наблюдаемы и детерминированы; утверждения ФД сверены с кодом (text.rs, detect.rs, render.rs, parse.rs: tasklist_classes, alerts, math_dollars; latex2mathml в workspace Cargo.toml; фикстуры tests/fixtures/**).",
         "QA-001 NOTICE: AC-10 — для проверки всех классов общего списка эталонный документ должен содержать алерты всех пяти видов; учтено в SC-011.",
@@ -209,11 +197,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002",
-        "ARCH-003"
-      ],
+      "findings": ["ARCH-001", "ARCH-002", "ARCH-003"],
       "notes": [
         "Режим дельты: правки FR-3, FR-8, FR-10 и карты реализации закрывают NOTICE ARCH-001, ARCH-002 и ARCH-003; правки FR-6, FR-7, AC-6, AC-7 и AC-10 новых архитектурных дефектов не вносят.",
         "Сверено: text::MAX_NESTING (64) уже есть в crates/nimmd-core/src/text.rs; JS-правила .semgrep.yml исключают только packages/vendor и node_modules, поэтому packages/theme/*.js они проверяют."
@@ -224,9 +208,7 @@
       "event": "handback_accepted",
       "phase": "security-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-003"
-      ],
+      "findings": ["SEC-003"],
       "notes": [
         "Дельта FR-3/6/7/8/10, AC-6/7/10 закрывает SEC-001 (схема http/https по декодированному url) и SEC-002 (лимит длины/вложенности до latex2mathml, расширенный AC-7).",
         "SEC-003 NOTICE: рекурсия latex2mathml по аргументам без скобок не сверена — крейта ещё нет в Cargo.lock."
@@ -237,9 +219,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-002"
-      ],
+      "findings": ["QA-002"],
       "notes": [
         "Дельта: FR-3, FR-6, FR-7, FR-8, FR-10, AC-6, AC-7, AC-10 перечитаны; все AC остаются наблюдаемыми и детерминированными.",
         "QA-001 снят: AC-10 теперь требует алерты всех пяти видов.",
@@ -349,9 +329,7 @@
       "files_count": 13,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T12:50:33+00:00",
@@ -369,20 +347,14 @@
       "event": "handback_accepted",
       "phase": "code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-004",
-        "ARCH-005",
-        "ARCH-006"
-      ]
+      "findings": ["ARCH-004", "ARCH-005", "ARCH-006"]
     },
     {
       "at": "2026-10-25T13:05:31+00:00",
       "event": "handback_accepted",
       "phase": "security-code-review",
       "verdict": "APPROVED",
-      "findings": [
-        "SEC-004"
-      ],
+      "findings": ["SEC-004"],
       "notes": [
         "cargo deny check: advisories/bans/licenses/sources ok (run outside sandbox: advisory DB lock in ~/.cargo is read-only in sandbox)",
         "gitleaks dir over control/changed-files.txt: no leaks; semgrep .semgrep.yml: clean; registry rulesets unavailable (semgrep.dev connection error) -> SEC-004 NOTICE",
@@ -749,4 +721,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

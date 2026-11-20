@@ -15,22 +15,22 @@
 
 ## Ворота
 
-| Ключ | Значение |
-| --- | --- |
-| documents.functional_design | approved |
-| documents.test_cases | approved |
-| documents.user_guide | not_required |
-| document_reviews.architecture | approved |
-| document_reviews.security | approved |
-| document_reviews.qa | approved |
-| document_reviews.ux | not_required |
-| implementation.backend | done |
-| implementation.backend_tests | done |
-| implementation.frontend | not_required |
+| Ключ                          | Значение     |
+| ----------------------------- | ------------ |
+| documents.functional_design   | approved     |
+| documents.test_cases          | approved     |
+| documents.user_guide          | not_required |
+| document_reviews.architecture | approved     |
+| document_reviews.security     | approved     |
+| document_reviews.qa           | approved     |
+| document_reviews.ux           | not_required |
+| implementation.backend        | done         |
+| implementation.backend_tests  | done         |
+| implementation.frontend       | not_required |
 | implementation.frontend_tests | not_required |
-| verification.code_review | approved |
-| verification.security_review | approved |
-| verification.testing | approved |
+| verification.code_review      | approved     |
+| verification.security_review  | approved     |
+| verification.testing          | approved     |
 
 ## Подзадачи
 
@@ -43,7 +43,7 @@
 - 2026-10-25T22:44:07+00:00 `note` — {"text": "диспатч post-checks"}
 - 2026-10-25T23:03:53+00:00 `handback_accepted` — {"phase": "code-review", "verdict": "APPROVED", "findings": [], "notes": ["deny.toml вне карты реализации, но нужен для FR-4/AC-10 (RUSTSEC-2024-0320 yaml-rust только в dev-dependencies через yaml-load)", "semgrep локально не запущен: песочница запрещает запись ~/.semgrep/semgrep.log; just lint и just syntaxes (воспроизводимость дампа) не прогонялись — за тест-исполнителем"]}
 - 2026-10-25T23:03:53+00:00 `handback_accepted` — {"phase": "security-code-review", "verdict": "APPROVED", "findings": [], "notes": ["cargo deny check: advisories ok, bans ok, licenses ok, sources ok (запуск вне песочницы: lock базы RustSec в ~/.cargo read-only)", "semgrep (.semgrep.yml + p/rust p/typescript p/javascript p/secrets) по 8 изменённым .rs: 0 находок; лог semgrep перенаправлен в tmp_dir", "gitleaks dir по файлам из changed-files.txt: no leaks found", "yaml-rust 0.4.5 (RUSTSEC-2024-0320, unmaintained) нет в cargo tree -e normal ядра: только dev-dependencies для examples/build_syntaxes.rs", "Усиление HTML в head до 2 МБ (CSV из одних разделителей, около x23) — ограничено HIGHLIGHT_LIMIT по дизайну, находкой не оформлено"]}
-- 2026-10-25T23:03:54+00:00 `handback_accepted` — {"phase": "backend-tests", "verdict": "DONE", "findings": [], "notes": ["Coverage: SC-001 file_kind_from_extension, file_kind_serde_lowercase; SC-002 toml_yaml_json_highlighted_in_data_wrapper, markdown_has_no_data_css; SC-003 json_file_classes_match_markdown_block (+ existing insta snapshots, git status crates/nimmd-core/tests/snapshots is empty, no .snap.new); SC-004 text_escaped_without_highlight; SC-005 data_has_no_profile_frontmatter_or_scripts (Link and Inline assets, 4 kinds); SC-006 highlight_limit_splits_head_and_tail, highlight_limit_exact_boundary, long_line_without_newline_cut_at_char_boundary; SC-007 decode_lossy_replaces_invalid_bytes (tests/text.rs), not_utf8_bom_crlf_and_truncation; SC-008 detect_delimiter_cases, detect_delimiter_ties_and_mode, detect_delimiter_reads_first_50_records; SC-009 csv_colored_by_column, csv_cases_keep_text, csv_edge_inputs_keep_text; SC-010 csv_fixtures_keep_text (new fixtures tests/fixtures/data/{semicolon,quoted,tabs,ragged}.csv); SC-012 data_languages_have_spans; SC-013 rust_spans_in_utf16, unknown_and_empty_language, large_code_highlights_only_head, span_serializes_to_json", "Randomized/differential tests with fixed seeds: random_csv_matches_reference (3000 inputs, independent char-level RFC 4180 tokenizer + FR-7 delimiter + FR-8 coloring), random_tables_detect_their_delimiter (500 tables), random_code_matches_reference (400 inputs vs syntect ScopeRangeIterator over load_defaults_newlines), random_data_keeps_text (300 inputs x 5 kinds)", "Red evidence: this is a feature (new symbols), so git stash of production gives compile errors, not assertion failures. Ran mutations instead (backups in control/.tmp/backend-tests/*.orig, restored; shasum of src/*.rs and git diff --stat identical before/after): csv.rs 'records > best.1'->'>=' fails detect_delimiter_ties_and_mode (csv.rs:31), random_csv_matches_reference; highlight.rs split_head 'i + 1'->'i' fails highlight_limit_splits_head_and_tail (data.rs:288), highlight_limit_exact_boundary, large_code_highlights_only_head; spans offset bytes instead of UTF-16 fails rust_spans_in_utf16, random_code_matches_reference; data.rs highlighting TXT fails text_escaped_without_highlight; csv.rs 'column % 8'->'column' fails csv_colored_by_column, csv_cases_keep_text", "Surviving mutant: document.rs 'if markdown { push_assets }' -> 'if true' survives; it is equivalent because data always uses Profile::default() (math/mermaid off), so push_assets writes nothing. Profile equality and no <script/<link are asserted", "Checks run: cargo fmt --all -- --check OK; cargo build --workspace --all-targets OK; cargo clippy --workspace --all-targets -- -D warnings clean; diff-lint.sh backend clean (clippy-changed, cargo-machete, semgrep); semgrep --config .semgrep.yml on the 4 test files: 0 findings; cargo test --workspace --all-targets green, 131 tests, 0 ignored/skipped", "Sandbox: semgrep cannot write ~/.semgrep/semgrep.log. Ran diff-lint/semgrep with SEMGREP_LOG_FILE and SEMGREP_SETTINGS_FILE pointing into control/.tmp/backend-tests, without disabling the sandbox", "Not run: full `just lint` (vendor needs the npm registry; deny and gitleaks git do not cover uncommitted test files). Static AC-10 checks run: just syntaxes prints 'TOML: ok' and the dump is byte-identical (cmp); LICENSE line 1 has commit 72065294da5dfb1862cd43177df4a50e29349135; cargo tree -p nimmd-core -d -e normal shows no duplicates; git grep --untracked for find_syntax_plain_text|from_binary|SyntectAdapter in src is empty", "Note for QA: src/csv.rs, data.rs and highlight.rs are untracked, so the AC-10 `git grep` without --untracked never searches them (vacuously empty). `git status --short crates/nimmd-core/assets` will list ?? until commit. I checked dump stability with cmp against a backup", "Timing: tests/data.rs takes about 13 s in debug, because of the 2 MB JSON/CSV highlight-limit inputs from AC-6"]}
+- 2026-10-25T23:03:54+00:00 `handback_accepted` — {"phase": "backend-tests", "verdict": "DONE", "findings": [], "notes": ["Coverage: SC-001 file_kind_from_extension, file_kind_serde_lowercase; SC-002 toml_yaml_json_highlighted_in_data_wrapper, markdown_has_no_data_css; SC-003 json_file_classes_match_markdown_block (+ existing insta snapshots, git status crates/nimmd-core/tests/snapshots is empty, no .snap.new); SC-004 text_escaped_without_highlight; SC-005 data_has_no_profile_frontmatter_or_scripts (Link and Inline assets, 4 kinds); SC-006 highlight_limit_splits_head_and_tail, highlight_limit_exact_boundary, long_line_without_newline_cut_at_char_boundary; SC-007 decode_lossy_replaces_invalid_bytes (tests/text.rs), not_utf8_bom_crlf_and_truncation; SC-008 detect_delimiter_cases, detect_delimiter_ties_and_mode, detect_delimiter_reads_first_50_records; SC-009 csv_colored_by_column, csv_cases_keep_text, csv_edge_inputs_keep_text; SC-010 csv_fixtures_keep_text (new fixtures tests/fixtures/data/{semicolon,quoted,tabs,ragged}.csv); SC-012 data_languages_have_spans; SC-013 rust_spans_in_utf16, unknown_and_empty_language, large_code_highlights_only_head, span_serializes_to_json", "Randomized/differential tests with fixed seeds: random_csv_matches_reference (3000 inputs, independent char-level RFC 4180 tokenizer + FR-7 delimiter + FR-8 coloring), random_tables_detect_their_delimiter (500 tables), random_code_matches_reference (400 inputs vs syntect ScopeRangeIterator over load_defaults_newlines), random_data_keeps_text (300 inputs x 5 kinds)", "Red evidence: this is a feature (new symbols), so git stash of production gives compile errors, not assertion failures. Ran mutations instead (backups in control/.tmp/backend-tests/_.orig, restored; shasum of src/_.rs and git diff --stat identical before/after): csv.rs 'records > best.1'->'>=' fails detect_delimiter_ties_and_mode (csv.rs:31), random_csv_matches_reference; highlight.rs split_head 'i + 1'->'i' fails highlight_limit_splits_head_and_tail (data.rs:288), highlight_limit_exact_boundary, large_code_highlights_only_head; spans offset bytes instead of UTF-16 fails rust_spans_in_utf16, random_code_matches_reference; data.rs highlighting TXT fails text_escaped_without_highlight; csv.rs 'column % 8'->'column' fails csv_colored_by_column, csv_cases_keep_text", "Surviving mutant: document.rs 'if markdown { push_assets }' -> 'if true' survives; it is equivalent because data always uses Profile::default() (math/mermaid off), so push_assets writes nothing. Profile equality and no <script/<link are asserted", "Checks run: cargo fmt --all -- --check OK; cargo build --workspace --all-targets OK; cargo clippy --workspace --all-targets -- -D warnings clean; diff-lint.sh backend clean (clippy-changed, cargo-machete, semgrep); semgrep --config .semgrep.yml on the 4 test files: 0 findings; cargo test --workspace --all-targets green, 131 tests, 0 ignored/skipped", "Sandbox: semgrep cannot write ~/.semgrep/semgrep.log. Ran diff-lint/semgrep with SEMGREP_LOG_FILE and SEMGREP_SETTINGS_FILE pointing into control/.tmp/backend-tests, without disabling the sandbox", "Not run: full `just lint` (vendor needs the npm registry; deny and gitleaks git do not cover uncommitted test files). Static AC-10 checks run: just syntaxes prints 'TOML: ok' and the dump is byte-identical (cmp); LICENSE line 1 has commit 72065294da5dfb1862cd43177df4a50e29349135; cargo tree -p nimmd-core -d -e normal shows no duplicates; git grep --untracked for find_syntax_plain_text|from_binary|SyntectAdapter in src is empty", "Note for QA: src/csv.rs, data.rs and highlight.rs are untracked, so the AC-10 `git grep` without --untracked never searches them (vacuously empty). `git status --short crates/nimmd-core/assets` will list ?? until commit. I checked dump stability with cmp against a backup", "Timing: tests/data.rs takes about 13 s in debug, because of the 2 MB JSON/CSV highlight-limit inputs from AC-6"]}
 - 2026-10-25T23:03:54+00:00 `handback_accepted` — {"phase": "testing", "verdict": "APPROVED", "findings": [], "notes": ["Полный прогон не повторён: control/suite-run.backend-tests.json result=green, tree 54d452755887dd88719d2d7c1f2a2813bb092bc4 = текущему tree-hash (до и после проверок).", "Фокусно: cargo test -p nimmd-core --test data --test csv --test highlight --test text — 42 passed, 0 failed, 0 ignored; --test render --test document — 53 passed (снапшоты Markdown без .snap.new, git status tests/snapshots пуст).", "SC-003: cargo-insta не установлен — вместо cargo insta test прогнан cargo test тех же тестов insta (несовпадение снапшота роняет assert) + проверка отсутствия .snap.new.", "SC-011: just syntaxes — 'TOML: ok', shasum syntaxes.packdump до/после совпал (assets ещё не в git, поэтому сравнение по хэшу); первая строка LICENSE — commit 72065294…, тот же хэш есть в FD; cargo tree -p nimmd-core -d -e normal — 'nothing to print'; git grep --untracked (новые src-файлы не в индексе) — 0 совпадений.", "SC-012: just lint зелёный по рецептам: fmt-check, clippy, semgrep (SEMGREP_LOG_FILE/SETTINGS направлены в tmp_dir — песочница запрещает запись в ~/.semgrep), deny и vendor — вне песочницы (lock в ~/.cargo/advisory-dbs и pnpm store только для чтения), npm-licenses, unused-deps, secrets, workflows — в песочнице. cargo deny: только старые предупреждения license-exception-not-encountered.", "gitleaks dir по каждому файлу правки и тестов — 0 находок (gitleaks git не видит незакоммиченную правку)."]}
 - 2026-10-25T23:03:54+00:00 `marked` — {"key": "implementation.backend_tests", "value": "done"}
 - 2026-10-25T23:03:54+00:00 `marked` — {"key": "verification.code_review", "value": "approved"}
@@ -57,6 +57,7 @@
 ## Снимок состояния (для restore)
 
 <!-- afd-state-snapshot:begin -->
+
 ```json
 {
   "repo": "syper-freedm/NimMD",
@@ -65,9 +66,7 @@
   "slug": "pokazyvat-fayly-dannyh-toml-yaml-json-csv-i-txt",
   "branch": "feat/44-pokazyvat-fayly-dannyh-toml-yaml-json",
   "size": "M",
-  "areas": [
-    "backend"
-  ],
+  "areas": ["backend"],
   "state": "completion",
   "result": "in_progress",
   "documents": {
@@ -111,9 +110,7 @@
       "at": "2026-10-25T22:26:14+00:00",
       "event": "classified",
       "size": "M",
-      "areas": [
-        "backend"
-      ]
+      "areas": ["backend"]
     },
     {
       "at": "2026-10-25T22:27:22+00:00",
@@ -132,10 +129,7 @@
       "event": "handback_accepted",
       "phase": "architecture-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "ARCH-001",
-        "ARCH-002"
-      ],
+      "findings": ["ARCH-001", "ARCH-002"],
       "notes": [
         "architecture.md не создан: новые публичные контракты зафиксированы в ФД, отдельное решение записывать не нужно"
       ]
@@ -158,10 +152,7 @@
       "event": "handback_accepted",
       "phase": "qa-document-review",
       "verdict": "APPROVED",
-      "findings": [
-        "QA-001",
-        "QA-002"
-      ],
+      "findings": ["QA-001", "QA-002"],
       "notes": [
         "AC-1…AC-11 проверяемы; test-cases.md: SC-001…SC-013, validate-tests OK, 2596/2700 токенов",
         "QA-001 NOTICE: мода FR-7 при ничьей не определена; QA-002 NOTICE: лимит подсветки CSV без AC, у AC-10 нет входа для highlight",
@@ -330,9 +321,7 @@
       "files_count": 17,
       "has_migrations": false,
       "touches_isolation": false,
-      "skip": [
-        "documentation"
-      ]
+      "skip": ["documentation"]
     },
     {
       "at": "2026-10-25T22:44:07+00:00",
@@ -762,4 +751,5 @@
   }
 }
 ```
+
 <!-- afd-state-snapshot:end -->

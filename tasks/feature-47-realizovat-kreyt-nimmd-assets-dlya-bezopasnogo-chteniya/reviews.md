@@ -3,6 +3,7 @@
 ## Проверка функционального дизайна
 
 ### Архитектор решения
+
 - Статус: APPROVED
 - ID: ARCH-001
 - Уровень: NOTICE
@@ -16,6 +17,7 @@
 - Требуемый результат: `parent() == None` → `Io`, без `unwrap`.
 
 ### Специалист по ИБ
+
 - Статус: APPROVED
 
 - ID: SEC-001
@@ -31,6 +33,7 @@
 - Требуемый результат: хост показывает SVG только в контексте картинки (`<img>`/data URI), не вставляет в DOM; зафиксировать в задаче хоста.
 
 ### Тестировщик
+
 - Статус: APPROVED
 - Все AC-1…AC-6 проверяемы; `test-cases.md` заполнен (SC-001…SC-010).
 - Дельта (FR-2 шаг 4, AC-1, AC-6): QA-001 и QA-002 закрыты; SC-001 дополнен `img\a.png`.
@@ -48,16 +51,19 @@
 - Требуемый результат: критерий для `Display` — непустой русский текст у каждого варианта (так в SC-009).
 
 ### UX-ревьюер
+
 - Статус: PENDING
 
 ## Проверка реализации
 
 ### Качество кода
+
 - Статус: APPROVED
 - Соответствие FR/AC: CONFIRMED
 - Несвязанные изменения: NONE
 
 ### Безопасность кода
+
 - Статус: APPROVED
 - Проверены меры ИБ: CONFIRMED
 - semgrep (.semgrep.yml, p/rust, p/secrets): 0; gitleaks: no leaks; deny bans/licenses/sources ok. Выход за базу закрыт `canonicalize`+`starts_with`.
@@ -69,6 +75,7 @@
 - Требуемый результат: прогнать в `just lint` вне песочницы.
 
 ### Выполнение тестов
+
 - Статус: APPROVED
 - Полный набор: `suite-run.backend-tests.json` green, tree = текущий, не перезапускал.
 - `cargo test -p nimmd-assets` 15/15; `git grep --untracked` — только `#![forbid(unsafe_code)]`; `just lint` по шагам rc=0, deny advisories ok (вне песочницы).

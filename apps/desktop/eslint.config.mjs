@@ -9,7 +9,10 @@ export default [
   {
     files: ["src/**/*.ts"],
     languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     plugins: { "no-unsanitized": noUnsanitized },
     rules: {

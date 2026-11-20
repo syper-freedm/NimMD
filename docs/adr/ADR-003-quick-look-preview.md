@@ -17,16 +17,16 @@
 
 Контракт для #50:
 
-| Тема | Решение |
-| --- | --- |
-| API | view-based, `preparePreviewOfFile`; completion — только после `didFinish` (и `callAsyncJavaScript` при math/mermaid), не сразу после `loadHTMLString` / `loadFileURL` |
-| JS | включён в `WKWebViewConfiguration`; KaTeX/Mermaid из бандла appex через `AssetMode::Link` (не CDN); Mermaid — только по профилю |
-| Картинки | `WKURLSchemeHandler` (`nimmd-asset://` или аналог) → `nimmd_read_asset`; `WKContentRuleList` против сети; entitlement read-only к каталогу документа |
-| Сеть | `com.apple.security.network.client` **нужен** даже для пустой офлайн-страницы (К20): без него Web Content-процесс WKWebView в sandbox appex часто не стартует; сеть режется правилами контента, не отсутствием entitlement |
-| Тема | `data-theme` из ядра: `Auto` опирается на `prefers-color-scheme` в CSS; при необходимости хост задаёт `Theme::Light`/`Dark` по `effectiveAppearance` до `render` |
-| UTI | свои типы для Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`) и данных (`.toml` — проверить `mdls`, иначе экспортировать свой UTI; `.yaml`/`.yml`, `.json`, `.csv`, `.txt`); **без** `public.plain-text` (В3, Р21) |
-| Подпись | ad-hoc для v1 (`codesign -s -`): сначала appex, затем `.app` (#66); Developer ID — #87 |
-| Ресурсы | `AssetMode::Link { base_url }`, не `Inline`: mermaid.min.js ≈ 3,6 МиБ |
+| Тема     | Решение                                                                                                                                                                                                                    |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API      | view-based, `preparePreviewOfFile`; completion — только после `didFinish` (и `callAsyncJavaScript` при math/mermaid), не сразу после `loadHTMLString` / `loadFileURL`                                                      |
+| JS       | включён в `WKWebViewConfiguration`; KaTeX/Mermaid из бандла appex через `AssetMode::Link` (не CDN); Mermaid — только по профилю                                                                                            |
+| Картинки | `WKURLSchemeHandler` (`nimmd-asset://` или аналог) → `nimmd_read_asset`; `WKContentRuleList` против сети; entitlement read-only к каталогу документа                                                                       |
+| Сеть     | `com.apple.security.network.client` **нужен** даже для пустой офлайн-страницы (К20): без него Web Content-процесс WKWebView в sandbox appex часто не стартует; сеть режется правилами контента, не отсутствием entitlement |
+| Тема     | `data-theme` из ядра: `Auto` опирается на `prefers-color-scheme` в CSS; при необходимости хост задаёт `Theme::Light`/`Dark` по `effectiveAppearance` до `render`                                                           |
+| UTI      | свои типы для Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`) и данных (`.toml` — проверить `mdls`, иначе экспортировать свой UTI; `.yaml`/`.yml`, `.json`, `.csv`, `.txt`); **без** `public.plain-text` (В3, Р21)         |
+| Подпись  | ad-hoc для v1 (`codesign -s -`): сначала appex, затем `.app` (#66); Developer ID — #87                                                                                                                                     |
+| Ресурсы  | `AssetMode::Link { base_url }`, не `Inline`: mermaid.min.js ≈ 3,6 МиБ                                                                                                                                                      |
 
 ## Замеры первого кадра / бюджета
 
@@ -34,22 +34,22 @@
 
 ### Рендер ядра, 1 МиБ (порог В2 = 100 мс)
 
-| Вход | Apple Silicon (#45) | Linux x86_64 (этот спайк, release) |
-| --- | ---: | ---: |
-| prose | 35,5 мс | 47,6 мс |
-| code | 32,6 мс | 40,4 мс |
-| json | 19,8 мс | 22,1 мс |
-| csv | 5,0 мс | 7,4 мс |
+| Вход  | Apple Silicon (#45) | Linux x86_64 (этот спайк, release) |
+| ----- | ------------------: | ---------------------------------: |
+| prose |             35,5 мс |                            47,6 мс |
+| code  |             32,6 мс |                            40,4 мс |
+| json  |             19,8 мс |                            22,1 мс |
+| csv   |              5,0 мс |                             7,4 мс |
 
 На Linux порог ×3 (300 мс) зелёный; на AS — абсолютный 100 мс зелёный.
 
 ### HTML и `AssetMode` (fixture math + mermaid, release, Linux)
 
-| Режим | Медиана `render` | Размер `html` |
-| --- | ---: | ---: |
-| без ассетов | ~6 µs | ≈ 5 КиБ |
-| `Link` (`nimmd-asset://bundle`) | ~4 µs | ≈ 6 КиБ |
-| `Inline` с реальным vendor | ~4,2 мс | ≈ 3,9 МиБ |
+| Режим                           | Медиана `render` | Размер `html` |
+| ------------------------------- | ---------------: | ------------: |
+| без ассетов                     |            ~6 µs |       ≈ 5 КиБ |
+| `Link` (`nimmd-asset://bundle`) |            ~4 µs |       ≈ 6 КиБ |
+| `Inline` с реальным vendor      |          ~4,2 мс |     ≈ 3,9 МиБ |
 
 Размеры vendor: `katex.min.css` ≈ 25 КиБ, `katex.min.js` ≈ 267 КиБ, `mermaid.min.js` ≈ 3,6 МиБ.
 
