@@ -45,6 +45,10 @@ jobs:
         with:
           node-version: "26.13.0"
           package-manager-cache: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: "1.27.4"
+          cache: false
       - name: Установить semgrep, gitleaks, actionlint, pnpm
         run: | # zizmor: ignore[adhoc-packages] pnpm закреплён точной версией
           pipx install semgrep==1.182.0
