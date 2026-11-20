@@ -21,7 +21,8 @@ use std::{
 use tauri::{AppHandle, DragDropEvent, RunEvent, Url, WebviewWindow, WindowEvent};
 use tauri_plugin_opener::OpenerExt;
 
-use launch::Launch;
+use launch::{Launch, Mode};
+use view::EditorDocument;
 use windows::{PreparedLaunch, Registry, WindowLaunch};
 
 #[tauri::command]
@@ -41,7 +42,7 @@ async fn get_view(
     state: tauri::State<'_, Mutex<Registry>>,
 ) -> Result<RenderedView, String> {
     let file = Registry::lock(state.inner())
-        .view_file(window.label())
+        .file_for(window.label(), Mode::View)
         .ok_or_else(|| "У этого окна нет файла для просмотра.".to_owned())?;
     let body = tauri::async_runtime::spawn_blocking(move || file.render())
         .await
@@ -52,6 +53,33 @@ async fn get_view(
         body,
         window_label: window.label().to_owned(),
     })
+}
+
+#[tauri::command]
+async fn get_editor(
+    window: WebviewWindow,
+    state: tauri::State<'_, Mutex<Registry>>,
+) -> Result<RenderedEditor, String> {
+    let file = Registry::lock(state.inner())
+        .file_for(window.label(), Mode::Edit)
+        .ok_or_else(|| "У этого окна нет файла для редактирования.".to_owned())?;
+    let document = tauri::async_runtime::spawn_blocking(move || file.editor_document())
+        .await
+        .map_err(|_| {
+            "Не удалось подготовить редактор. Закройте окно и откройте файл снова.".to_owned()
+        })??;
+    Ok(RenderedEditor {
+        document,
+        window_label: window.label().to_owned(),
+    })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenderedEditor {
+    #[serde(flatten)]
+    document: EditorDocument,
+    window_label: String,
 }
 
 #[derive(serde::Serialize)]
@@ -112,6 +140,7 @@ fn build_app() -> tauri::Result<tauri::App> {
         .invoke_handler(tauri::generate_handler![
             get_launch,
             get_view,
+            get_editor,
             open_external
         ])
         .build(tauri::generate_context!())

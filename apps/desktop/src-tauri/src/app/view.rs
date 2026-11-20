@@ -12,13 +12,19 @@ use same_file::Handle;
 // Запас на CRLF, BOM и многобайтовый символ у границы нормализованного текста.
 const MAX_READ: usize = 2 * text::MAX_BYTES + 8;
 
+#[derive(serde::Serialize)]
+pub(super) struct EditorDocument {
+    pub(super) body: String,
+    pub(super) source: Option<String>,
+}
+
 #[derive(Clone)]
-pub(super) struct ViewFile {
+pub(super) struct DocumentFile {
     path: PathBuf,
     identity: Result<Arc<Handle>, String>,
 }
 
-impl ViewFile {
+impl DocumentFile {
     pub(super) fn prepare(
         path: &Path,
         canonical_file: impl FnOnce() -> io::Result<PathBuf>,
@@ -57,18 +63,27 @@ impl ViewFile {
     }
 
     pub(super) fn render(&self) -> Result<String, String> {
+        self.read(false).map(|document| document.body)
+    }
+
+    pub(super) fn editor_document(&self) -> Result<EditorDocument, String> {
+        self.read(true)
+    }
+
+    fn read(&self, include_source: bool) -> Result<EditorDocument, String> {
         let original = self.identity.as_ref().map_err(Clone::clone)?;
-        self.render_bound(original)
+        self.render_bound(original, include_source)
             .map_err(|error| read_error(&self.path, &error))
     }
 
-    fn render_bound(&self, original: &Handle) -> io::Result<String> {
+    fn render_bound(&self, original: &Handle, include_source: bool) -> io::Result<EditorDocument> {
         let current = open_matching(&self.path, original)?;
 
         let file = current.as_file();
         let mut bytes = Vec::new();
         file.take(MAX_READ as u64).read_to_end(&mut bytes)?;
-        if bytes.len() == MAX_READ && file.metadata()?.len() > MAX_READ as u64 {
+        let incomplete = bytes.len() == MAX_READ && file.metadata()?.len() > MAX_READ as u64;
+        if incomplete {
             let tail = bytes
                 .utf8_chunks()
                 .last()
@@ -95,7 +110,13 @@ impl ViewFile {
             not_utf8,
             ..RenderOptions::default()
         };
-        Ok(render(&source, &options).body)
+        let rendered = render(&source, &options);
+        let source = (include_source && !not_utf8 && !incomplete && !rendered.truncated)
+            .then(|| text::strip_bom(&source).1.to_owned());
+        Ok(EditorDocument {
+            body: rendered.body,
+            source,
+        })
     }
 }
 
@@ -146,10 +167,37 @@ fn read_error(path: &Path, error: &io::Error) -> String {
 mod tests {
     use super::*;
 
-    fn bind(path: &Path) -> ViewFile {
-        let (key, view) = ViewFile::prepare(path, || path.canonicalize()).unwrap();
+    fn bind(path: &Path) -> DocumentFile {
+        let (key, view) = DocumentFile::prepare(path, || path.canonicalize()).unwrap();
         assert!(key.is_some());
         view
+    }
+
+    #[test]
+    fn editor_gets_body_and_original_text_from_one_read() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("заметка.md");
+        let source = "# Заголовок\r\n\r\n%%неизвестно%%\rстрока\n";
+        std::fs::write(&path, format!("\u{FEFF}{source}")).unwrap();
+
+        let document = bind(&path).editor_document().unwrap();
+        assert_eq!(document.source.as_deref(), Some(source));
+        assert!(document.body.contains("<h1>Заголовок</h1>"));
+    }
+
+    #[test]
+    fn editor_does_not_get_lossy_or_truncated_source() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("заметка.txt");
+        std::fs::write(&path, b"text\xff").unwrap();
+        let document = bind(&path).editor_document().unwrap();
+        assert!(document.source.is_none());
+        assert!(document.body.contains("banner not-utf8"));
+
+        std::fs::write(&path, "x".repeat(text::MAX_BYTES + 1)).unwrap();
+        let document = bind(&path).editor_document().unwrap();
+        assert!(document.source.is_none());
+        assert!(document.body.contains("banner truncated"));
     }
 
     #[test]
@@ -193,7 +241,7 @@ mod tests {
         let bound = bind(&path);
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
         assert!(bound.render().unwrap_err().contains("«недоступный.md»"));
-        let (_, denied) = ViewFile::prepare(&path, || path.canonicalize()).unwrap();
+        let (_, denied) = DocumentFile::prepare(&path, || path.canonicalize()).unwrap();
         assert!(denied.render().unwrap_err().contains("«недоступный.md»"));
     }
 
@@ -225,7 +273,7 @@ mod tests {
         let bound = bind(&path);
         let (tx, rx) = mpsc::channel();
         let worker = thread::spawn(move || {
-            let (key, preparing) = ViewFile::prepare(&path, || {
+            let (key, preparing) = DocumentFile::prepare(&path, || {
                 let canonical = path.canonicalize()?;
                 std::fs::rename(&path, folder.path().join("исходник.txt"))?;
                 assert!(
@@ -254,7 +302,7 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("заметка.md");
         std::fs::write(&path, "# Исходник").unwrap();
-        let (key, view) = ViewFile::prepare(&path, || {
+        let (key, view) = DocumentFile::prepare(&path, || {
             let canonical = path.canonicalize()?;
             std::fs::rename(&path, folder.path().join("исходник.md"))?;
             std::fs::write(&path, "# Замена")?;
