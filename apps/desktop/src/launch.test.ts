@@ -2,9 +2,49 @@ import { afterEach, expect, test, vi } from "vitest";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { showLaunch } from "./launch";
 
-afterEach(clearMocks);
+afterEach(() => {
+  clearMocks();
+  vi.unstubAllGlobals();
+});
 
-test.each(["edit", "view"] as const)("показывает режим %s и путь из Rust IPC", async (mode) => {
+test("показывает первый кадр из Rust перед монтированием редактора", async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+  let errors: string[] = [];
+  mockIPC((command) => command === "get_launch"
+    ? { mode: "edit", path: "note.md", errors }
+    : { body: '<main class="nimmd"><h1>Первый кадр</h1></main>', windowLabel: "nimmd-window-1", source: "# Исходник" });
+  const root = document.createElement("div");
+  const ready = showLaunch(root);
+  await vi.waitFor(() => { expect(frames).toHaveLength(1); });
+  expect(root.querySelector("main.nimmd h1")?.textContent).toBe("Первый кадр");
+  expect(root.querySelector(".cm-editor")).toBeNull();
+  frames.shift()?.(0);
+  expect(root.querySelector(".cm-editor")).toBeNull();
+  frames.shift()?.(16);
+  await ready;
+  expect(root.querySelector(".cm-content")?.textContent).toBe("# Исходник");
+  expect(root.querySelector("main.nimmd")).toBeNull();
+
+  const editor = root.querySelector(".cm-content");
+  errors = ["Ошибка другого файла"];
+  root.dispatchEvent(new Event("nimmd-launch-changed"));
+  await vi.waitFor(() => { expect(root.querySelector('[role="alert"]')?.textContent).toBe(errors[0]); });
+  expect(root.querySelector(".cm-content")).toBe(editor);
+});
+
+test("оставляет первый кадр, когда Rust не передал редактируемый текст", async () => {
+  mockIPC((command) => command === "get_launch"
+    ? { mode: "edit", path: "note.md", errors: [] }
+    : { body: '<main class="nimmd"><p>Только чтение</p></main>', windowLabel: "nimmd-window-1", source: null });
+  const root = document.createElement("div");
+  await showLaunch(root);
+  expect(root.querySelector("main.nimmd")?.textContent).toBe("Только чтение");
+  expect(root.querySelector(".cm-editor")).toBeNull();
+});
+
+test("показывает режим просмотра и путь из Rust IPC", async () => {
+  const mode = "view";
   const calls: string[] = [];
   mockIPC((command) => {
     calls.push(command);
@@ -14,7 +54,7 @@ test.each(["edit", "view"] as const)("показывает режим %s и пу
   await showLaunch(root);
   expect(calls).toEqual(["get_launch"]);
   expect(root.dataset.mode).toBe(mode);
-  expect(root.querySelector("h1")?.textContent).toBe(mode === "view" ? "Просмотр" : "Редактирование");
+  expect(root.querySelector("h1")?.textContent).toBe("Просмотр");
   expect(root.querySelector("p")?.textContent).toBe("заметка с пробелами.md");
   expect(root.querySelector("textarea, [contenteditable]" )).toBeNull();
 });

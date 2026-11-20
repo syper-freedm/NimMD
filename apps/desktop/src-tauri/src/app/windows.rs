@@ -14,7 +14,7 @@ use tauri::{
 use super::{
     assets::DocumentAssets,
     launch::{Launch, Mode},
-    view::ViewFile,
+    view::DocumentFile,
 };
 
 #[derive(Clone, Serialize)]
@@ -23,7 +23,7 @@ pub(super) struct WindowLaunch {
     launch: Launch,
     errors: Vec<String>,
     #[serde(skip)]
-    view: Option<ViewFile>,
+    file: Option<DocumentFile>,
 }
 
 #[derive(Default)]
@@ -47,14 +47,10 @@ pub(super) struct PreparedLaunch {
 
 impl PreparedLaunch {
     pub(super) fn new(launch: Launch) -> io::Result<Self> {
-        let (key, view) = if let Some(path) = &launch.path {
+        let (key, file) = if let Some(path) = &launch.path {
             Launch::validate_file_path(path)?;
-            if launch.mode == Mode::View {
-                let (canonical, view) = ViewFile::prepare(path, || Launch::canonical_file(path))?;
-                (canonical.map(WindowKey::File), Some(view))
-            } else {
-                (Some(WindowKey::File(Launch::canonical_file(path)?)), None)
-            }
+            let (canonical, file) = DocumentFile::prepare(path, || Launch::canonical_file(path))?;
+            (canonical.map(WindowKey::File), Some(file))
         } else {
             (Some(WindowKey::Empty), None)
         };
@@ -63,7 +59,7 @@ impl PreparedLaunch {
             data: WindowLaunch {
                 launch,
                 errors: Vec::new(),
-                view,
+                file,
             },
         })
     }
@@ -82,10 +78,10 @@ impl Registry {
         self.by_label.get(label).cloned()
     }
 
-    pub(super) fn view_file(&self, label: &str) -> Option<ViewFile> {
+    pub(super) fn file_for(&self, label: &str, mode: Mode) -> Option<DocumentFile> {
         let data = self.by_label.get(label)?;
-        if data.launch.mode == Mode::View {
-            data.view.clone()
+        if data.launch.mode == mode {
+            data.file.clone()
         } else {
             None
         }
@@ -288,7 +284,7 @@ pub(super) fn open_batch(
         WindowLaunch {
             launch: Launch::default(),
             errors: errors.clone(),
-            view: None,
+            file: None,
         },
     ) {
         eprintln!("{}\n{error}", errors.join("\n"));
@@ -354,7 +350,11 @@ mod tests {
 
         let mut registry = Registry::default();
         let label = registry.register(key, data);
-        let error = registry.view_file(&label).unwrap().render().unwrap_err();
+        let error = registry
+            .file_for(&label, Mode::View)
+            .unwrap()
+            .render()
+            .unwrap_err();
         assert!(error.contains("по этому пути теперь находится другой файл"));
     }
 
@@ -369,7 +369,7 @@ mod tests {
                     path: Some(PathBuf::from("/a/<note>.md")),
                 },
                 errors: vec!["Выберите файл.".into()],
-                view: None,
+                file: None,
             },
         );
         let second = registry.register(
@@ -377,7 +377,7 @@ mod tests {
             WindowLaunch {
                 launch: Launch::from_path(PathBuf::from("/b/note.md")),
                 errors: Vec::new(),
-                view: None,
+                file: None,
             },
         );
         assert_eq!(
@@ -412,19 +412,34 @@ mod tests {
             WindowLaunch {
                 launch: Launch::default(),
                 errors: Vec::new(),
-                view: None,
+                file: None,
             },
         );
-        let first_body = registry.view_file(&first).unwrap().render().unwrap();
-        let second_body = registry.view_file(&second).unwrap().render().unwrap();
+        let first_body = registry
+            .file_for(&first, Mode::View)
+            .unwrap()
+            .render()
+            .unwrap();
+        let second_body = registry
+            .file_for(&second, Mode::View)
+            .unwrap()
+            .render()
+            .unwrap();
         assert!(first_body.starts_with(r#"<main class="nimmd">"#));
         assert!(first_body.contains("Первый документ"));
         assert!(!first_body.contains("Второй документ"));
         assert!(second_body.contains("Второй документ"));
         assert!(!second_body.contains("Первый документ"));
-        assert!(registry.view_file(&editor).is_none());
-        assert!(registry.view_file(&empty).is_none());
-        assert!(registry.view_file("unknown-window").is_none());
+        assert!(registry.file_for(&editor, Mode::View).is_none());
+        assert!(registry.file_for(&first, Mode::Edit).is_none());
+        let document = registry
+            .file_for(&editor, Mode::Edit)
+            .unwrap()
+            .editor_document()
+            .unwrap();
+        assert_eq!(document.source.as_deref(), Some("Документ в редакторе"));
+        assert!(registry.file_for(&empty, Mode::View).is_none());
+        assert!(registry.file_for("unknown-window", Mode::View).is_none());
     }
 
     #[test]
@@ -598,7 +613,7 @@ mod tests {
             WindowLaunch {
                 launch: Launch::from_path(PathBuf::from("/note.md")),
                 errors: Vec::new(),
-                view: None,
+                file: None,
             },
         );
         assert!(
@@ -616,7 +631,7 @@ mod tests {
                     path: Some(PathBuf::from("/note.md")),
                 },
                 errors: Vec::new(),
-                view: None,
+                file: None,
             },
         );
         Registry::lock(&state).remove(&first); // Запоздавшее событие Destroyed.
