@@ -6,165 +6,20 @@ import {
 } from "./document-fragment";
 import type { Launch } from "./launch";
 
-type Block = { node: HTMLElement; source: string };
+import {
+  diagramTooLong,
+  documentLimit,
+  maxBlocks,
+  maxDiagramLength,
+  maxMathLength,
+  maxTotalLength,
+  renderDiagrams,
+  renderMath,
+  type Block,
+} from "./render-blocks";
 
-interface ViewLibraries extends Window {
-  katex?: {
-    render: (
-      source: string,
-      node: HTMLElement,
-      options: {
-        displayMode: boolean;
-        trust: false;
-        throwOnError: false;
-        errorColor: string;
-      },
-    ) => void;
-  };
-  mermaid?: {
-    initialize: (options: {
-      securityLevel: "strict";
-      startOnLoad: false;
-      layout: "dagre";
-      theme: "default" | "dark";
-      suppressErrorRendering: true;
-      deterministicIds: true;
-    }) => void;
-    run: (options: {
-      nodes: HTMLElement[];
-      suppressErrors: true;
-    }) => Promise<void>;
-  };
-}
-
-const libraries: ViewLibraries = window;
-const maxMathLength = 4096;
-const maxDiagramLength = 8192;
-const maxBlocks = 32;
-const maxTotalLength = 32_768;
-const documentLimit = "Превышен лимит документа для формул и диаграмм.";
-const diagramTooLong = "Диаграмма слишком длинная.";
 const viewError =
   "Не удалось показать документ. Закройте окно и откройте файл снова.";
-const mathErrorColor = "var(--nimmd-katex-error)";
-
-function loadAsset(asset: HTMLLinkElement | HTMLScriptElement): Promise<void> {
-  return new Promise((resolve, reject) => {
-    asset.addEventListener(
-      "load",
-      () => {
-        resolve();
-      },
-      { once: true },
-    );
-    asset.addEventListener(
-      "error",
-      () => {
-        asset.remove();
-        reject(new Error("Ресурс недоступен"));
-      },
-      { once: true },
-    );
-    document.head.append(asset);
-  });
-}
-
-async function renderMath(blocks: Block[]): Promise<void> {
-  if (!blocks.length) return;
-  const css = document.createElement("link");
-  css.rel = "stylesheet";
-  css.href = "/vendor/katex.min.css";
-  const script = document.createElement("script");
-  script.src = "/vendor/katex.min.js";
-  try {
-    await Promise.all([loadAsset(css), loadAsset(script)]);
-    if (!libraries.katex) throw new Error("KaTeX недоступен");
-  } catch {
-    for (const { node } of blocks)
-      showBlockMessage(
-        node,
-        "Не удалось отрисовать формулу. Ресурс недоступен.",
-      );
-    return;
-  }
-
-  for (const { node, source } of blocks) {
-    const output = document.createElement("span");
-    try {
-      libraries.katex.render(source, output, {
-        displayMode: node.dataset.mathStyle === "display",
-        trust: false,
-        throwOnError: false,
-        errorColor: mathErrorColor,
-      });
-      // KaTeX с throwOnError: false помечает неизвестные команды цветом в MathML.
-      if (
-        output.querySelector(`.katex-error, [mathcolor="${mathErrorColor}"]`)
-      ) {
-        throw new Error("Ошибка TeX");
-      }
-      node.replaceChildren(...output.childNodes);
-    } catch {
-      showBlockMessage(node, "Не удалось отрисовать формулу.");
-    }
-  }
-}
-
-async function renderDiagrams(diagrams: Block[]): Promise<void> {
-  if (!diagrams.length) return;
-  // Самозапуск Mermaid привязан к load. Подключаем скрипт после события.
-  if (document.readyState !== "complete") {
-    await new Promise<void>((resolve) => {
-      window.addEventListener(
-        "load",
-        () => {
-          resolve();
-        },
-        { once: true },
-      );
-    });
-  }
-
-  const script = document.createElement("script");
-  script.src = "/vendor/mermaid.min.js";
-  let mermaid;
-  try {
-    await loadAsset(script);
-    mermaid = libraries.mermaid;
-    if (!mermaid) throw new Error("Mermaid недоступен");
-    mermaid.initialize({
-      securityLevel: "strict",
-      startOnLoad: false,
-      layout: "dagre",
-      theme: window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "default",
-      suppressErrorRendering: true,
-      deterministicIds: true,
-    });
-  } catch {
-    for (const { node } of diagrams)
-      showBlockMessage(
-        node,
-        "Не удалось отрисовать диаграмму. Ресурс недоступен.",
-      );
-    return;
-  }
-  try {
-    await mermaid.run({
-      nodes: diagrams.map(({ node }) => node),
-      suppressErrors: true,
-    });
-  } catch {
-    // Результат и исходник проверяются для каждого блока отдельно.
-  }
-  for (const { node, source } of diagrams) {
-    if (node.querySelector(":scope > svg")) continue;
-    node.textContent = source;
-    node.removeAttribute("data-processed");
-    showBlockMessage(node, "Не удалось отрисовать диаграмму.");
-  }
-}
 
 async function renderBlocks(main: HTMLElement): Promise<void> {
   const math: Block[] = [];

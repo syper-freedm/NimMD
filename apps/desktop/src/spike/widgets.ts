@@ -4,70 +4,14 @@ import { StateField } from "@codemirror/state";
 import type { EditorState, Range } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import { Table } from "@lezer/markdown";
+import { TableWidget } from "../table-widget";
 
 export const markdownSyntax = markdown({
   extensions: Table,
   completeHTMLTags: false,
 });
 const maxDiagramLength = 8192;
-type MarkdownNode = ReturnType<typeof syntaxTree>["topNode"];
 type RenderDiagram = (node: HTMLElement, source: string) => void;
-
-class TableWidget extends WidgetType {
-  constructor(
-    private readonly source: string,
-    private readonly block: MarkdownNode,
-  ) {
-    super();
-  }
-
-  eq(other: TableWidget) {
-    return this.source === other.source;
-  }
-
-  toDOM(view: EditorView): HTMLElement {
-    const table = view.dom.ownerDocument.createElement("table");
-    const head = table.createTHead();
-    const body = table.createTBody();
-    let columns = 0;
-    for (let row = this.block.firstChild; row; row = row.nextSibling) {
-      const header = row.name === "TableHeader";
-      if (!header && row.name !== "TableRow") continue;
-      const tr = (header ? head : body).insertRow();
-      const from = row.from - this.block.from;
-      const to = row.to - this.block.from;
-      const pipes = row
-        .getChildren("TableDelimiter")
-        .map((pipe) => pipe.from - this.block.from);
-      if (pipes[0] !== from) pipes.unshift(from - 1);
-      if (
-        pipes.at(-1) !==
-        from + this.source.slice(from, to).trimEnd().length - 1
-      )
-        pipes.push(to);
-      if (header) columns = pipes.length - 1;
-      for (let column = 0; column < columns; column++) {
-        const cell = view.dom.ownerDocument.createElement(header ? "th" : "td");
-        const left = pipes[column];
-        const right = pipes[column + 1];
-        if (left !== undefined && right !== undefined) {
-          cell.textContent = this.source
-            .slice(left + 1, right)
-            .trim()
-            .replaceAll("\\|", "|");
-        }
-        tr.append(cell);
-      }
-    }
-    table.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      view.dispatch({ selection: { anchor: view.posAtDOM(table) } });
-      view.focus();
-    });
-    return table;
-  }
-}
 
 class MermaidWidget extends WidgetType {
   constructor(

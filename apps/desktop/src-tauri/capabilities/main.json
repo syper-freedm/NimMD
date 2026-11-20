@@ -7,6 +7,14 @@
     "allow-get-launch",
     "allow-get-view",
     "allow-get-editor",
+    "allow-highlight",
+    "allow-read-editor",
+    "allow-save-editor",
+    "allow-recover-editor",
+    "allow-finish-editor-close",
+    "allow-set-document-edited",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "allow-open-external"
   ]
 }

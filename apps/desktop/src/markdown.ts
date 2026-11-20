@@ -9,6 +9,21 @@ import {
 } from "@codemirror/state";
 import { GFM, type InlineParser, type MarkdownConfig } from "@lezer/markdown";
 
+const markdownEscapes =
+  /\\([\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e])|&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/g;
+
+export function decodeMarkdown(text: string): string {
+  return text.replace(markdownEscapes, (matched, escaped?: string) => {
+    if (escaped) return escaped;
+    // В DOMParser попадает только одна проверенная ссылка на символ.
+    const parsed = new DOMParser().parseFromString(
+      `<span data-value="${matched}"></span>`,
+      "text/html",
+    );
+    return parsed.querySelector("span")?.getAttribute("data-value") ?? matched;
+  });
+}
+
 function token(
   name: string,
   marker: string,

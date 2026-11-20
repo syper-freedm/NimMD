@@ -32,6 +32,12 @@ pub(super) struct Registry {
     by_file: HashMap<WindowKey, String>,
     by_label: HashMap<String, WindowLaunch>,
     assets: HashMap<String, Arc<DocumentAssets>>,
+    #[cfg(target_os = "macos")]
+    pub(super) watchers: HashMap<String, notify::RecommendedWatcher>,
+    #[cfg(target_os = "macos")]
+    pub(super) editor_sessions: std::collections::BTreeSet<String>,
+    #[cfg(target_os = "macos")]
+    pub(super) pending_exit: Option<super::edit::ExitIntent>,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -109,6 +115,11 @@ impl Registry {
 
     pub(super) fn remove(&mut self, label: &str) {
         self.assets.remove(label);
+        #[cfg(target_os = "macos")]
+        {
+            self.watchers.remove(label);
+            self.editor_sessions.remove(label);
+        }
         self.by_label.remove(label);
         self.by_file.retain(|_, current| current != label);
     }
@@ -162,6 +173,8 @@ fn reuse(
 
 fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::Result<()> {
     let title = data.launch.window_title();
+    #[cfg(target_os = "macos")]
+    let represented_file = data.launch.path.clone();
     let mut config = app
         .config()
         .app
@@ -187,7 +200,14 @@ fn create(app: &AppHandle, file: Option<WindowKey>, data: WindowLaunch) -> io::R
             .on_navigation(move |url| same_page(url, &page))
             .on_new_window(|_, _| NewWindowResponse::Deny)
             .build()?;
-        if let Err(error) = activate(&window) {
+        let show = || {
+            #[cfg(target_os = "macos")]
+            if let Some(path) = represented_file.as_deref() {
+                crate::platform::document_window::set_represented_file(&window, path)?;
+            }
+            activate(&window)
+        };
+        if let Err(error) = show() {
             let _ = window.destroy();
             return Err(error);
         }

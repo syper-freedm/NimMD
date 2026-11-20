@@ -3,7 +3,13 @@
 mod assets;
 #[cfg(target_os = "macos")]
 mod cli;
+#[cfg(target_os = "macos")]
+mod document_window;
+#[cfg(target_os = "macos")]
+mod edit;
 pub mod launch;
+#[cfg(target_os = "macos")]
+mod save;
 mod view;
 mod windows;
 
@@ -63,12 +69,30 @@ async fn get_editor(
     let file = Registry::lock(state.inner())
         .file_for(window.label(), Mode::Edit)
         .ok_or_else(|| "У этого окна нет файла для редактирования.".to_owned())?;
+    #[cfg(target_os = "macos")]
+    let watch_warning = {
+        let mut state = Registry::lock(state.inner());
+        state.editor_sessions.insert(window.label().to_owned());
+        match state.watchers.entry(window.label().to_owned()) {
+            std::collections::hash_map::Entry::Vacant(entry) => match edit::watch(&window, &file) {
+                Ok(watcher) => {
+                    entry.insert(watcher);
+                    None
+                }
+                Err(error) => Some(format!("Не удалось включить отслеживание файла: {error}")),
+            },
+            std::collections::hash_map::Entry::Occupied(_) => None,
+        }
+    };
+    #[cfg(not(target_os = "macos"))]
+    let watch_warning = None;
     let document = tauri::async_runtime::spawn_blocking(move || file.editor_document())
         .await
         .map_err(|_| {
             "Не удалось подготовить редактор. Закройте окно и откройте файл снова.".to_owned()
         })??;
     Ok(RenderedEditor {
+        watch_warning,
         document,
         window_label: window.label().to_owned(),
     })
@@ -77,6 +101,7 @@ async fn get_editor(
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RenderedEditor {
+    watch_warning: Option<String>,
     #[serde(flatten)]
     document: EditorDocument,
     window_label: String,
@@ -87,6 +112,13 @@ struct RenderedEditor {
 struct RenderedView {
     body: String,
     window_label: String,
+}
+
+#[tauri::command]
+async fn highlight(lang: String, code: String) -> Result<Vec<nimmd_core::Span>, String> {
+    tauri::async_runtime::spawn_blocking(move || nimmd_core::highlight(&lang, &code))
+        .await
+        .map_err(|error| error.to_string())
 }
 
 fn external_url(input: &str) -> Option<Url> {
@@ -125,8 +157,43 @@ fn prepare_startup(
     Ok(pending)
 }
 
+#[cfg(target_os = "macos")]
+const QUIT_MENU_ID: &str = "nimmd-quit";
+
+#[cfg(target_os = "macos")]
+fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, MenuItemKind};
+
+    let menu = Menu::default(app)?;
+    let Some(MenuItemKind::Submenu(application)) = menu.items()?.into_iter().next() else {
+        return Err(tauri::Error::UnexpectedMenuKind);
+    };
+    let items = application.items()?;
+    // Предопределённый Quit вызывает NSApplication.terminate напрямую.
+    // Команда меню вместо него направляет Cmd+Q в обработчик ExitRequested.
+    let Some((MenuItemKind::Predefined(_), rest)) = items.split_last() else {
+        return Err(tauri::Error::UnexpectedMenuKind);
+    };
+    application.remove_at(rest.len())?;
+    application.append(&MenuItem::with_id(
+        app,
+        QUIT_MENU_ID,
+        "Завершить NimMD",
+        true,
+        Some("Cmd+Q"),
+    )?)?;
+    Ok(menu)
+}
+
 fn build_app() -> tauri::Result<tauri::App> {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+        if event.id() == QUIT_MENU_ID {
+            app.exit(0);
+        }
+    });
+    builder
         .manage(Mutex::new(Registry::default()))
         // Встроенный скрипт Opener обрабатывает больше схем, чем разрешено NimMD.
         .plugin(
@@ -141,6 +208,17 @@ fn build_app() -> tauri::Result<tauri::App> {
             get_launch,
             get_view,
             get_editor,
+            highlight,
+            #[cfg(target_os = "macos")]
+            edit::read_editor,
+            #[cfg(target_os = "macos")]
+            edit::save_editor,
+            #[cfg(target_os = "macos")]
+            edit::recover_editor,
+            #[cfg(target_os = "macos")]
+            edit::finish_editor_close,
+            #[cfg(target_os = "macos")]
+            document_window::set_document_edited,
             open_external
         ])
         .build(tauri::generate_context!())
@@ -170,6 +248,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let startup_error = Rc::new(Cell::new(None));
     let error_out = Rc::clone(&startup_error);
     app.run_return(move |app, event| match event {
+        #[cfg(target_os = "macos")]
+        ref event if edit::handle_lifecycle(app, event) => {}
         RunEvent::Ready => ready = true,
         RunEvent::MainEventsCleared if ready => {
             if let Some((pending, urls)) = &startup {
@@ -249,6 +329,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     startup_error
         .take()
         .map_or(Ok(()), |error| Err(error.into()))
+}
+
+/// Запрашивает перезапуск, предварительно сохраняя открытые документы.
+#[cfg(target_os = "macos")]
+pub fn request_editor_restart(app: &AppHandle) {
+    if !edit::begin_exit(app, true) {
+        app.request_restart();
+    }
 }
 
 #[cfg(test)]

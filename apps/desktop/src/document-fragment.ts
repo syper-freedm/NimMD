@@ -10,6 +10,16 @@ export function showBlockMessage(node: HTMLElement, message: string): void {
   node.after(notice);
 }
 
+export function documentImageUrl(windowLabel: string, source: string): string {
+  const path = source.split(/[?#]/, 1)[0] ?? "";
+  const endpoint = convertFileSrc(windowLabel, "nimmd-asset");
+  return `${endpoint}?${new URLSearchParams({ path })}`;
+}
+
+export function isExternalLink(url: string): boolean {
+  return /^(https?:\/\/|mailto:)/i.test(url);
+}
+
 function prepareDocument(main: HTMLElement, windowLabel: string): void {
   for (const image of main.querySelectorAll("img")) {
     const src = image.getAttribute("src") ?? "";
@@ -28,9 +38,7 @@ function prepareDocument(main: HTMLElement, windowLabel: string): void {
     }
     image.addEventListener("error", showPlaceholder, { once: true });
     if (!/^data:/i.test(src)) {
-      const path = src.split(/[?#]/, 1)[0] ?? "";
-      const endpoint = convertFileSrc(windowLabel, "nimmd-asset");
-      image.src = `${endpoint}?${new URLSearchParams({ path })}`;
+      image.src = documentImageUrl(windowLabel, src);
     }
   }
 
@@ -40,7 +48,7 @@ function prepareDocument(main: HTMLElement, windowLabel: string): void {
     const url = link?.getAttribute("href")?.trim();
     if (!link || url?.startsWith("#")) return;
     event.preventDefault();
-    if (url && /^(https?:\/\/|mailto:)/i.test(url)) {
+    if (url && isExternalLink(url)) {
       void invoke("open_external", { url }).catch(() => {
         showBlockMessage(link, "Не удалось открыть ссылку.");
       });

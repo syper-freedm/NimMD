@@ -1,5 +1,8 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { emit } from "@tauri-apps/api/event";
+import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { EditorView } from "@codemirror/view";
+import type { EditorDocument } from "./editor-file";
 import { showLaunch } from "./launch";
 
 afterEach(() => {
@@ -13,14 +16,19 @@ test("показывает первый кадр из Rust перед монти
     frames.push(callback),
   );
   let errors: string[] = [];
-  mockIPC((command) =>
-    command === "get_launch"
-      ? { mode: "edit", path: "note.md", errors }
-      : {
-          body: '<main class="nimmd"><h1>Первый кадр</h1></main>',
-          windowLabel: "nimmd-window-1",
-          source: "# Исходник",
-        },
+  mockWindows("nimmd-window-1");
+  mockIPC(
+    (command) =>
+      command === "get_launch"
+        ? { mode: "edit", path: "note.md", errors }
+        : {
+            body: '<main class="nimmd"><h1>Первый кадр</h1></main>',
+            windowLabel: "nimmd-window-1",
+            source: "# Исходник",
+            revision: "a",
+            watchWarning: null,
+          },
+    { shouldMockEvents: true },
   );
   const root = document.createElement("div");
   const ready = showLaunch(root);
@@ -45,19 +53,114 @@ test("показывает первый кадр из Rust перед монти
   expect(root.querySelector(".cm-content")).toBe(editor);
 });
 
-test("оставляет первый кадр, когда Rust не передал редактируемый текст", async () => {
-  mockIPC((command) =>
-    command === "get_launch"
-      ? { mode: "edit", path: "note.md", errors: [] }
-      : {
-          body: '<main class="nimmd"><p>Только чтение</p></main>',
-          windowLabel: "nimmd-window-1",
-          source: null,
-        },
+const readOnlyDocument = {
+  body: '<main class="nimmd"><h1>Отрисованный документ</h1></main>',
+  windowLabel: "nimmd-window-1",
+  source: null,
+  revision: null,
+  watchWarning: null,
+  format: null,
+  readOnlyText: "# Исходник\n\n**жирный** <img src=x> �",
+};
+
+test.each([
+  ["tooLarge", "Файл слишком большой для редактирования"],
+  ["notUtf8", "Кодировка не UTF-8"],
+])(
+  "показывает причину %s и отключает редактирование и сохранение",
+  async (readOnlyReason, banner) => {
+    const calls: string[] = [];
+    mockWindows("nimmd-window-1");
+    mockIPC(
+      (command) => {
+        calls.push(command);
+        if (command === "get_launch")
+          return { mode: "edit", path: "note.md", errors: [] };
+        if (command === "get_editor")
+          return { ...readOnlyDocument, readOnlyReason };
+        if (command === "finish_editor_close") return;
+        throw new Error(command);
+      },
+      { shouldMockEvents: true },
+    );
+
+    const root = document.createElement("div");
+    await showLaunch(root);
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain(banner);
+    expect(root.querySelector("pre")?.textContent).toBe(
+      "# Исходник\n\n**жирный** <img src=x> �",
+    );
+    expect(
+      root.querySelector("main h1, img, .cm-editor, [contenteditable=true]"),
+    ).toBeNull();
+
+    root.querySelector("pre")?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "s",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await emit("nimmd-editor-close");
+    await vi.waitFor(() => {
+      expect(calls).toEqual([
+        "get_launch",
+        "get_editor",
+        "finish_editor_close",
+      ]);
+    });
+  },
+);
+
+test("переключает чтение и редактирование по внешним изменениям", async () => {
+  const editable = {
+    ...readOnlyDocument,
+    source: "# Можно править",
+    revision: "b",
+    format: { bom: false, crlf: false },
+    readOnlyReason: null,
+    readOnlyText: null,
+  };
+  const initial: EditorDocument = {
+    ...readOnlyDocument,
+    readOnlyReason: "tooLarge",
+  };
+  let disk: EditorDocument = editable;
+  mockWindows("nimmd-window-1");
+  mockIPC(
+    (command) => {
+      if (command === "get_launch")
+        return { mode: "edit", path: "note.md", errors: [] };
+      if (command === "get_editor") return initial;
+      if (command === "read_editor") return disk;
+      throw new Error(command);
+    },
+    { shouldMockEvents: true },
   );
+
   const root = document.createElement("div");
   await showLaunch(root);
-  expect(root.querySelector("main.nimmd")?.textContent).toBe("Только чтение");
+  expect(root.querySelector("pre")?.textContent).toBe(
+    readOnlyDocument.readOnlyText,
+  );
+  await emit("nimmd-editor-external");
+  await vi.waitFor(() => {
+    expect(root.querySelector(".cm-content")?.textContent).toBe(
+      "# Можно править",
+    );
+  });
+
+  disk = {
+    ...readOnlyDocument,
+    revision: "c",
+    readOnlyReason: "notUtf8",
+    readOnlyText: "новый �",
+  };
+  await emit("nimmd-editor-external");
+  await vi.waitFor(() => {
+    expect(root.querySelector("pre")?.textContent).toBe("новый �");
+  });
   expect(root.querySelector(".cm-editor")).toBeNull();
 });
 
@@ -133,4 +236,129 @@ test("загруженное окно показывает новую ошибк
   expect(root.querySelector(".document-path")?.textContent).toBe(
     "Файл не выбран",
   );
+});
+
+test("дожидается сохранения правок перед ответом на запрос закрытия", async () => {
+  mockWindows("nimmd-window-1");
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+    frames.push(callback),
+  );
+  let finishWrite!: (reply: { status: "saved"; revision: string }) => void;
+  const write = new Promise((resolve) => {
+    finishWrite = resolve;
+  });
+  const calls: [string, unknown][] = [];
+  mockIPC(
+    (command, args) => {
+      calls.push([command, args]);
+      if (command === "get_launch")
+        return { mode: "edit", path: "note.md", errors: [] };
+      if (command === "get_editor") {
+        return {
+          body: '<main class="nimmd"><p>Первый кадр</p></main>',
+          windowLabel: "nimmd-window-1",
+          source: "исходный",
+          revision: "a",
+          watchWarning: null,
+        };
+      }
+      if (command === "save_editor") return write;
+      if (command === "set_document_edited") return null;
+      if (command === "finish_editor_close") return null;
+      throw new Error(command);
+    },
+    { shouldMockEvents: true },
+  );
+  const root = document.createElement("div");
+  const ready = showLaunch(root);
+  await vi.waitFor(() => {
+    expect(frames).toHaveLength(1);
+  });
+  frames.shift()?.(0);
+  frames.shift()?.(16);
+  await ready;
+  const buffer = root.querySelector(".cm-content");
+  expect(buffer).not.toBeNull();
+  const paste = new Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(paste, "clipboardData", {
+    value: { getData: () => "правка " },
+  });
+  buffer?.dispatchEvent(paste);
+  expect(paste.defaultPrevented).toBe(true);
+  await emit("nimmd-editor-close", null);
+  await vi.waitFor(() => {
+    expect(calls).toContainEqual([
+      "save_editor",
+      { source: "правка исходный", revision: "a" },
+    ]);
+  });
+  expect(calls.some(([command]) => command === "finish_editor_close")).toBe(
+    false,
+  );
+  expect(buffer?.getAttribute("contenteditable")).toBe("false");
+  finishWrite({ status: "saved", revision: "b" });
+  await vi.waitFor(() => {
+    expect(calls).toContainEqual(["finish_editor_close", { confirmed: true }]);
+  });
+});
+
+test("обновляет индикатор окна в порядке быстрых правок", async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+    frames.push(callback),
+  );
+  const edits: boolean[] = [];
+  let releaseFirstUpdate!: () => void;
+  const firstUpdate = new Promise<void>((resolve) => {
+    releaseFirstUpdate = resolve;
+  });
+  mockWindows("nimmd-window-1");
+  mockIPC(
+    (command, args) => {
+      if (command === "get_launch")
+        return { mode: "edit", path: "note.md", errors: [] };
+      if (command === "get_editor") {
+        return {
+          ...readOnlyDocument,
+          source: "исходный",
+          revision: "a",
+          readOnlyReason: null,
+          readOnlyText: null,
+          format: { bom: false, crlf: false },
+        };
+      }
+      if (command === "set_document_edited" && args && "edited" in args) {
+        edits.push(Boolean(args.edited));
+        if (edits.length === 1) return firstUpdate;
+        return;
+      }
+      throw new Error(command);
+    },
+    { shouldMockEvents: true },
+  );
+  const root = document.createElement("div");
+  const ready = showLaunch(root);
+  await vi.waitFor(() => {
+    expect(frames).toHaveLength(1);
+  });
+  frames.shift()?.(0);
+  frames.shift()?.(16);
+  await ready;
+  expect(edits).toEqual([]);
+  const element = root.querySelector<HTMLElement>(".cm-editor");
+  const editor = element && EditorView.findFromDOM(element);
+  if (!editor) throw new Error("Редактор не открылся");
+
+  editor.dispatch({ changes: { from: 0, insert: "+" } });
+  await vi.waitFor(() => {
+    expect(edits).toEqual([true]);
+  });
+  editor.dispatch({ changes: { from: 0, to: 1 } });
+  await Promise.resolve();
+  expect(edits).toEqual([true]);
+  releaseFirstUpdate();
+  await vi.waitFor(() => {
+    expect(edits).toEqual([true, false]);
+  });
 });

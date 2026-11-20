@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { documentFragment, type RenderedView } from "./document-fragment";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { EditorView } from "@codemirror/view";
+import { documentFragment } from "./document-fragment";
+import type { EditorFile, EditorDocument, ReadOnlyReason } from "./editor-file";
 
 export interface Launch {
   mode: "edit" | "view";
@@ -7,8 +10,25 @@ export interface Launch {
   errors: string[];
 }
 
-interface EditorDocument extends RenderedView {
-  source: string | null;
+function readOnlyFrame(
+  document: Document,
+  reason: ReadOnlyReason,
+  source: string,
+): HTMLElement {
+  const main = document.createElement("main");
+  main.className = "nimmd editor-document";
+  const banner = document.createElement("p");
+  banner.className = "banner";
+  banner.setAttribute("role", "alert");
+  banner.textContent =
+    reason === "tooLarge"
+      ? "Файл слишком большой для редактирования. Показаны первые 10 МиБ."
+      : "Кодировка не UTF-8. Редактирование недоступно.";
+  const text = document.createElement("pre");
+  text.tabIndex = 0;
+  text.textContent = source;
+  main.append(banner, text);
+  return main;
 }
 
 async function openEditor(content: HTMLElement): Promise<void> {
@@ -16,26 +36,112 @@ async function openEditor(content: HTMLElement): Promise<void> {
   status.setAttribute("role", "status");
   status.textContent = "Загрузка документа…";
   content.replaceChildren(status);
+  let file: EditorFile | undefined;
+  let externalPending = false;
+  let closingBeforeMount = false;
+  const finishClose = async (confirmed: boolean): Promise<void> => {
+    await invoke("finish_editor_close", { confirmed });
+  };
+  const isClosing = () => closingBeforeMount;
+  const hasPendingChange = () => externalPending;
   try {
-    const payload = await invoke<EditorDocument>("get_editor");
-    const firstFrame = documentFragment(payload);
-    status.replaceWith(firstFrame);
-    if (payload.source === null) return;
+    const webview = getCurrentWebview();
+    await Promise.all([
+      webview.listen("nimmd-editor-external", () => {
+        if (file) void file.refresh();
+        else externalPending = true;
+      }),
+      webview.listen("nimmd-editor-close", () => {
+        if (file) {
+          void file.close(finishClose);
+        } else if (!closingBeforeMount) {
+          closingBeforeMount = true;
+          void finishClose(true).catch(() => {
+            closingBeforeMount = false;
+          });
+        }
+      }),
+    ]);
+    if (isClosing()) return;
 
-    // Между двумя callback WebView успевает показать HTML ядра.
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
+    const payload = await invoke<EditorDocument>("get_editor");
+    if (isClosing()) return;
+    const firstFrame =
+      payload.source === null
+        ? readOnlyFrame(
+            content.ownerDocument,
+            payload.readOnlyReason,
+            payload.readOnlyText,
+          )
+        : documentFragment(payload);
+    status.replaceWith(firstFrame);
+
+    if (payload.source !== null) {
+      // Между двумя callback WebView успевает показать HTML ядра.
+      await new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
-          resolve();
+          requestAnimationFrame(() => {
+            resolve();
+          });
         });
       });
-    });
-    const { mountEditor } = await import("./editor");
+    }
+    if (isClosing()) return;
+    const [{ mountEditor, setEditorLocked }, { EditorFile }] =
+      await Promise.all([import("./editor"), import("./editor-file")]);
+    if (isClosing()) return;
+    const notice = document.createElement("div");
     const editorRoot = document.createElement("div");
-    editorRoot.className = "editor-document";
-    const editor = mountEditor(editorRoot, payload.source);
-    firstFrame.replaceWith(editorRoot);
-    editor.focus();
+    editorRoot.className = "nimmd editor-document";
+    let view: EditorView | undefined;
+    let titleUpdate = Promise.resolve();
+    const show = (next: EditorDocument, frame?: HTMLElement) => {
+      const focused = view?.hasFocus ?? true;
+      view?.destroy();
+      view = undefined;
+      if (next.source === null) {
+        content.replaceChildren(
+          notice,
+          frame ??
+            readOnlyFrame(
+              content.ownerDocument,
+              next.readOnlyReason,
+              next.readOnlyText,
+            ),
+        );
+        return;
+      }
+      content.replaceChildren(editorRoot);
+      editorRoot.replaceChildren(notice);
+      view = mountEditor(editorRoot, next.source, {
+        windowLabel: next.windowLabel,
+        onChange: () => {
+          file?.changed();
+        },
+        onSave: () => {
+          void file?.save();
+        },
+      });
+      if (focused) view.focus();
+    };
+    show(payload, firstFrame);
+    file = new EditorFile(notice, payload, {
+      read: () => view?.state.doc ?? null,
+      replace: show,
+      dirty: (dirty) => {
+        titleUpdate = titleUpdate
+          .then(async () => {
+            await invoke("set_document_edited", { edited: dirty });
+          })
+          .catch(() => {
+            // Состояние файла не зависит от того, успело ли окно обновить заголовок.
+          });
+      },
+      lock: (locked) => {
+        if (view) setEditorLocked(view, locked);
+      },
+    });
+    if (hasPendingChange()) await file.refresh();
   } catch (error) {
     status.setAttribute("role", "alert");
     status.textContent =

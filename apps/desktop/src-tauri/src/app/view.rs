@@ -8,19 +8,49 @@ use std::{
 
 use nimmd_core::{AssetMode, FileKind, RenderOptions, Theme, render, text};
 use same_file::Handle;
+use sha2::{Digest, Sha256};
 
 // Запас на CRLF, BOM и многобайтовый символ у границы нормализованного текста.
 const MAX_READ: usize = 2 * text::MAX_BYTES + 8;
 
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+pub(super) struct SourceFormat {
+    pub(super) bom: bool,
+    pub(super) crlf: bool,
+}
+
+impl SourceFormat {
+    pub(super) fn detect(source: &str) -> Self {
+        Self {
+            bom: text::strip_bom(source).0,
+            crlf: text::detect_line_ending(source) == text::LineEnding::CrLf,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ReadOnlyReason {
+    TooLarge,
+    NotUtf8,
+}
+
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct EditorDocument {
     pub(super) body: String,
     pub(super) source: Option<String>,
+    revision: Option<String>,
+    format: Option<SourceFormat>,
+    read_only_reason: Option<ReadOnlyReason>,
+    read_only_text: Option<String>,
 }
 
 #[derive(Clone)]
 pub(super) struct DocumentFile {
     path: PathBuf,
+    #[cfg(target_os = "macos")]
+    canonical: Option<PathBuf>,
     identity: Result<Arc<Handle>, String>,
 }
 
@@ -54,8 +84,10 @@ impl DocumentFile {
             }
         };
         Ok((
-            key,
+            key.clone(),
             Self {
+                #[cfg(target_os = "macos")]
+                canonical: key,
                 path: path.to_owned(),
                 identity: identity.map_err(|error| read_error(path, &error)),
             },
@@ -67,7 +99,30 @@ impl DocumentFile {
     }
 
     pub(super) fn editor_document(&self) -> Result<EditorDocument, String> {
+        #[cfg(target_os = "macos")]
+        let _operation = super::save::disk_edit();
         self.read(true)
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(super) fn editor_path(&self) -> Result<&Path, String> {
+        self.canonical.as_deref().ok_or_else(|| {
+            "Не удалось определить путь к документу. Откройте файл снова.".to_owned()
+        })
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(super) fn editor_latest(&self) -> Result<EditorDocument, String> {
+        let path = self.editor_path()?;
+        let read = || {
+            let _operation = super::save::disk_edit();
+            if path.canonicalize()? != path {
+                return Err(io::Error::other("путь к документу изменился"));
+            }
+            let file = super::save::open_regular(path, rustix::fs::OFlags::RDONLY)?;
+            self.render_file(&file, true, false)
+        };
+        read().map_err(|error| read_error(&self.path, &error))
     }
 
     fn read(&self, include_source: bool) -> Result<EditorDocument, String> {
@@ -78,22 +133,54 @@ impl DocumentFile {
 
     fn render_bound(&self, original: &Handle, include_source: bool) -> io::Result<EditorDocument> {
         let current = open_matching(&self.path, original)?;
+        self.render_file(current.as_file(), include_source, true)
+    }
 
-        let file = current.as_file();
+    fn render_file(
+        &self,
+        file: &File,
+        include_source: bool,
+        include_body: bool,
+    ) -> io::Result<EditorDocument> {
         let mut bytes = Vec::new();
-        file.take(MAX_READ as u64).read_to_end(&mut bytes)?;
-        let incomplete = bytes.len() == MAX_READ && file.metadata()?.len() > MAX_READ as u64;
+        let limit = if include_source {
+            text::MAX_BYTES + 4
+        } else {
+            MAX_READ
+        };
+        file.take(limit as u64).read_to_end(&mut bytes)?;
+        let too_large = bytes.len() > text::MAX_BYTES;
+        let incomplete = bytes.len() == limit && file.metadata()?.len() > limit as u64;
         if incomplete {
             let tail = bytes
                 .utf8_chunks()
                 .last()
                 .map_or(&[][..], |chunk| chunk.invalid());
             if std::str::from_utf8(tail).is_err_and(|error| error.error_len().is_none()) {
-                bytes.truncate(MAX_READ - tail.len());
+                bytes.truncate(limit - tail.len());
             }
         }
 
         let (source, not_utf8) = text::decode_lossy(&bytes);
+        if include_source && (too_large || not_utf8) {
+            let text = text::strip_bom(&source).1;
+            return Ok(EditorDocument {
+                body: String::new(),
+                source: None,
+                revision: (!too_large).then(|| revision(&bytes)),
+                format: None,
+                read_only_reason: Some(if too_large {
+                    ReadOnlyReason::TooLarge
+                } else {
+                    ReadOnlyReason::NotUtf8
+                }),
+                read_only_text: Some(
+                    text::truncate_at_char_boundary(text, text::MAX_BYTES)
+                        .0
+                        .to_owned(),
+                ),
+            });
+        }
         let kind = self
             .path
             .extension()
@@ -110,14 +197,27 @@ impl DocumentFile {
             not_utf8,
             ..RenderOptions::default()
         };
-        let rendered = render(&source, &options);
-        let source = (include_source && !not_utf8 && !incomplete && !rendered.truncated)
-            .then(|| text::strip_bom(&source).1.to_owned());
+        let body = if include_body {
+            render(&source, &options).body
+        } else {
+            String::new()
+        };
+        let format = include_source.then(|| SourceFormat::detect(&source));
+        let source = include_source.then(|| text::strip_bom(&source).1.to_owned());
+        let revision = include_source.then(|| revision(&bytes));
         Ok(EditorDocument {
-            body: rendered.body,
+            revision,
+            format,
+            read_only_reason: None,
+            read_only_text: None,
+            body,
             source,
         })
     }
+}
+
+pub(super) fn revision(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 fn open_matching(path: &Path, original: &Handle) -> io::Result<Handle> {
@@ -192,12 +292,32 @@ mod tests {
         std::fs::write(&path, b"text\xff").unwrap();
         let document = bind(&path).editor_document().unwrap();
         assert!(document.source.is_none());
-        assert!(document.body.contains("banner not-utf8"));
+        assert_eq!(document.read_only_reason, Some(ReadOnlyReason::NotUtf8));
+        assert_eq!(document.read_only_text.as_deref(), Some("text\u{fffd}"));
+        assert_eq!(document.body, "");
 
         std::fs::write(&path, "x".repeat(text::MAX_BYTES + 1)).unwrap();
         let document = bind(&path).editor_document().unwrap();
         assert!(document.source.is_none());
-        assert!(document.body.contains("banner truncated"));
+        assert_eq!(document.read_only_reason, Some(ReadOnlyReason::TooLarge));
+        assert_eq!(
+            document.read_only_text.as_deref().map(str::len),
+            Some(text::MAX_BYTES)
+        );
+        assert_eq!(document.body, "");
+    }
+
+    #[test]
+    fn editor_uses_raw_byte_limit_before_normalizing_crlf() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        let text_at_limit = "x\r\n".repeat(text::MAX_BYTES / 3) + &"x".repeat(text::MAX_BYTES % 3);
+        std::fs::write(&path, format!("{text_at_limit}x")).unwrap();
+        let doc = bind(&path).editor_document().unwrap();
+        assert!(doc.source.is_none());
+        assert_eq!(doc.read_only_reason, Some(ReadOnlyReason::TooLarge));
+        assert_eq!(doc.read_only_text.as_deref(), Some(text_at_limit.as_str()));
+        assert_eq!(doc.body, "");
     }
 
     #[test]

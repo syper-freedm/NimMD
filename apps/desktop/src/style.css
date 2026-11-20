@@ -12,3 +12,43 @@
 .document-path {
   overflow-wrap: anywhere;
 }
+
+.cm-heading {
+  font-weight: 600;
+}
+
+.cm-heading-1 {
+  font-size: 2em;
+}
+.cm-heading-2 {
+  font-size: 1.5em;
+}
+.cm-heading-3 {
+  font-size: 1.25em;
+}
+.cm-heading-4 {
+  font-size: 1em;
+}
+.cm-heading-5 {
+  font-size: 0.875em;
+}
+.cm-heading-6 {
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
+
+.cm-editor .cm-wikilink,
+.cm-editor .footnote-ref {
+  color: var(--link);
+}
+
+.cm-editor .cm-line.cm-quote {
+  border-inline-start: 0.25em solid var(--border);
+  color: var(--fg-muted);
+  padding-inline-start: 0.75em;
+}
+
+.cm-editor .cm-line.markdown-alert {
+  margin: 0;
+  padding: 0 0.75em;
+}

@@ -1,11 +1,10 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
 import {
+  Compartment,
   EditorState,
   StateEffect,
   StateField,
-  Text,
-  type Range,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -15,7 +14,23 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
+import { blockPreview } from "./block-preview";
+import { codePreview } from "./code-preview";
+import { editorText, normalizeCrlf } from "./editor-file";
+import { editorLinks, inlineDecorations } from "./inline-preview";
 import { markdownLanguage } from "./markdown";
+
+const editability = new Compartment();
+
+export function setEditorLocked(view: EditorView, locked: boolean): void {
+  if (view.state.readOnly === locked) return;
+  view.dispatch({
+    effects: editability.reconfigure([
+      EditorState.readOnly.of(locked),
+      EditorView.editable.of(!locked),
+    ]),
+  });
+}
 
 const togglePreview = StateEffect.define();
 const previewEnabled = StateField.define({
@@ -27,40 +42,10 @@ const previewEnabled = StateField.define({
   },
 });
 
-const strongText = Decoration.mark({ tagName: "strong" });
-const hiddenMarker = Decoration.replace({});
-
 function previewDecorations(view: EditorView): DecorationSet {
-  const { state, visibleRanges } = view;
-  if (!state.field(previewEnabled)) return Decoration.none;
-
-  const ranges: Range<Decoration>[] = [];
-  for (const { from, to } of visibleRanges) {
-    syntaxTree(state).iterate({
-      from,
-      to,
-      enter({ name, from: start, to: end }) {
-        if (name !== "StrongEmphasis") return;
-        const line = state.doc.lineAt(start);
-        if (
-          end > line.to ||
-          start < from ||
-          end > to ||
-          state.selection.ranges.some(
-            (selection) =>
-              selection.from <= line.to && selection.to >= line.from,
-          )
-        )
-          return;
-        ranges.push(
-          hiddenMarker.range(start, start + 2),
-          strongText.range(start + 2, end - 2),
-          hiddenMarker.range(end - 2, end),
-        );
-      },
-    });
-  }
-  return Decoration.set(ranges, true);
+  return view.state.field(previewEnabled)
+    ? inlineDecorations(view)
+    : Decoration.none;
 }
 
 const livePreview = ViewPlugin.fromClass(
@@ -93,18 +78,30 @@ const editorTheme = EditorView.theme({
   ".cm-line": { padding: "0" },
 });
 
-function normalizeCrlf(source: string): string {
-  return source.replaceAll("\r\n", "\n");
-}
-
-export function mountEditor(parent: HTMLElement, source: string): EditorView {
-  const doc = Text.of(normalizeCrlf(source).split("\n"));
+export function mountEditor(
+  parent: HTMLElement,
+  source: string,
+  {
+    windowLabel,
+    onChange,
+    onSave,
+  }: {
+    windowLabel?: string;
+    onChange?: () => void;
+    onSave?: () => void;
+  } = {},
+): EditorView {
+  const doc = editorText(source);
   return new EditorView({
     parent,
     state: EditorState.create({
       doc,
       extensions: [
+        editability.of([]),
         EditorState.lineSeparator.of("\n"),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) onChange?.();
+        }),
         EditorView.clipboardInputFilter.of(normalizeCrlf),
         EditorView.contentAttributes.of({
           "aria-label": "Исходный текст Markdown",
@@ -113,9 +110,20 @@ export function mountEditor(parent: HTMLElement, source: string): EditorView {
         markdownLanguage(doc),
         history(),
         previewEnabled,
+        blockPreview(windowLabel, (state) => state.field(previewEnabled)),
+        codePreview((state) => state.field(previewEnabled)),
         livePreview,
+        editorLinks,
         editorTheme,
         keymap.of([
+          {
+            key: "Mod-s",
+            run() {
+              if (!onSave) return false;
+              onSave();
+              return true;
+            },
+          },
           {
             key: "Mod-/",
             run(view) {
