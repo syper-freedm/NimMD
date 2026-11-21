@@ -11,6 +11,10 @@ desktop-check: desktop-deps
     cargo check -p nimmd-desktop
     pnpm -C apps/desktop run build
 
+# Подписанный бандл, архив обновления и образ для установки на macOS.
+build-macos:
+    bash scripts/build-macos.sh
+
 frontend-lint: desktop-deps
     pnpm -C apps/desktop exec tsc --noEmit
     pnpm -C apps/desktop run lint

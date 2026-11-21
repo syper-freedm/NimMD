@@ -38,12 +38,14 @@
     "fileAssociations": [
       {
         "ext": ["md", "markdown", "mdown", "mkd"],
+        "contentTypes": ["net.daringfireball.markdown", "io.github.syper-freedm.nimmd.markdown-extended"],
         "name": "Markdown",
         "mimeType": "text/markdown",
         "role": "Editor"
       },
       {
         "ext": ["toml"],
+        "contentTypes": ["public.toml", "io.github.syper-freedm.nimmd.toml"],
         "name": "TOML",
         "mimeType": "application/toml",
         "role": "Viewer"

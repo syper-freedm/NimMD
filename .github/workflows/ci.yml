@@ -30,6 +30,18 @@ jobs:
       - run: just bench-check
         env:
           NIMMD_BENCH_FACTOR: "3"
+      - name: Установить инструменты упаковки
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          cargo install --locked cbindgen --version 0.29.4
+          cargo install --locked cargo-about --version 0.9.3
+      - name: Проверить сборку установочного образа
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          signing=$(mktemp -d)
+          trap 'rm -rf "$signing"' EXIT
+          (umask 077; pnpm -C apps/desktop tauri signer generate --ci --password '' --write-keys "$signing/updater.key" > "$signing/generate.log")
+          TAURI_SIGNING_PRIVATE_KEY_PATH="$signing/updater.key" TAURI_SIGNING_PRIVATE_KEY_PASSWORD='' just build-macos
 
   lint:
     runs-on: macos-latest

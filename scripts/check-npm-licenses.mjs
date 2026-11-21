@@ -59,16 +59,18 @@ export function reconcile(byLicense, allowed, overrides) {
   };
 }
 
-function check(dir, prod, allowed) {
-  if (!existsSync(join(dir, "package.json"))) return [];
+export function npmLicenses(dir, prod) {
   const args = ["licenses", "list", "--json", ...(prod ? ["--prod"] : [])];
-  const byLicense = JSON.parse(
+  return JSON.parse(
     execFileSync("pnpm", args, {
       cwd: dir,
       encoding: "utf8",
       shell: process.platform === "win32",
     }) || "{}",
   );
+}
+
+export function licenseErrors(dir, byLicense, allowed) {
   const { violations, unused } = reconcile(
     byLicense,
     allowed,
@@ -89,9 +91,10 @@ function check(dir, prod, allowed) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [dir, ...flags] = process.argv.slice(2);
   const root = join(fileURLToPath(import.meta.url), "../..");
-  const errors = check(
+  if (!existsSync(join(dir, "package.json"))) process.exit(0);
+  const errors = licenseErrors(
     dir,
-    flags.includes("--prod"),
+    npmLicenses(dir, flags.includes("--prod")),
     allowedLicenses(readFileSync(join(root, "deny.toml"), "utf8")),
   );
   if (errors.length) {

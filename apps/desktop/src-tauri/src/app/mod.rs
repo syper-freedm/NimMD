@@ -161,8 +161,23 @@ fn prepare_startup(
 const QUIT_MENU_ID: &str = "nimmd-quit";
 
 #[cfg(target_os = "macos")]
+const LICENSES_MENU_ID: &str = "nimmd-licenses";
+
+#[cfg(target_os = "macos")]
+fn licenses_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    use tauri::Manager;
+
+    let path = app
+        .path()
+        .resource_dir()
+        .ok()?
+        .join("THIRD_PARTY_LICENSES.html");
+    path.is_file().then_some(path)
+}
+
+#[cfg(target_os = "macos")]
 fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, MenuItem, MenuItemKind};
+    use tauri::menu::{Menu, MenuItem, MenuItemKind, Submenu};
 
     let menu = Menu::default(app)?;
     let Some(MenuItemKind::Submenu(application)) = menu.items()?.into_iter().next() else {
@@ -182,18 +197,37 @@ fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
         true,
         Some("Cmd+Q"),
     )?)?;
+    let Some(about) = application.remove_at(0)? else {
+        return Err(tauri::Error::UnexpectedMenuKind);
+    };
+    let licenses = MenuItem::with_id(
+        app,
+        LICENSES_MENU_ID,
+        "Лицензии",
+        licenses_path(app).is_some(),
+        None::<&str>,
+    )?;
+    application.insert(
+        &Submenu::with_items(app, "О NimMD", true, &[&about, &licenses])?,
+        0,
+    )?;
     Ok(menu)
 }
 
 fn build_app() -> tauri::Result<tauri::App> {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+    let builder = builder.on_menu_event(|app, event| {
         if event.id() == QUIT_MENU_ID {
             app.exit(0);
+        } else if event.id() == LICENSES_MENU_ID
+            && let Some(path) = licenses_path(app)
+            && let Err(error) = tauri_plugin_opener::open_path(path, None::<&str>)
+        {
+            eprintln!("Не удалось открыть уведомления о лицензиях: {error}");
         }
     });
-    builder
+    let app = builder
         .manage(Mutex::new(Registry::default()))
         // Встроенный скрипт Opener обрабатывает больше схем, чем разрешено NimMD.
         .plugin(
@@ -221,7 +255,11 @@ fn build_app() -> tauri::Result<tauri::App> {
             document_window::set_document_edited,
             open_external
         ])
-        .build(tauri::generate_context!())
+        .build(tauri::generate_context!())?;
+    // При создании меню через Builder Tauri ещё не подготовил пути ресурсов.
+    #[cfg(target_os = "macos")]
+    app.set_menu(app_menu(app.handle())?)?;
+    Ok(app)
 }
 
 /// Запускает приложение или передаёт команду работающему экземпляру.

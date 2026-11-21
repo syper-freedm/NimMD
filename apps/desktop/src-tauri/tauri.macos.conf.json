@@ -1,0 +1,13 @@
+{
+  "build": {
+    "beforeBundleCommand": "node ../../scripts/third-party-licenses.mjs"
+  },
+  "bundle": {
+    "macOS": {
+      "files": {
+        "Resources/RUST_STDLIB_COPYRIGHT.html": "../../../target/RUST_STDLIB_COPYRIGHT.html",
+        "Resources/THIRD_PARTY_LICENSES.html": "../../../target/THIRD_PARTY_LICENSES.html"
+      }
+    }
+  }
+}

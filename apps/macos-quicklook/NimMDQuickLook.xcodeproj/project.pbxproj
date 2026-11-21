@@ -1,0 +1,98 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		A00000000000000000000001 /* Проект */ = {
+			isa = PBXProject;
+			buildConfigurationList = A00000000000000000000002;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ru;
+			knownRegions = (ru, Base);
+			mainGroup = A00000000000000000000003;
+			productRefGroup = A00000000000000000000004;
+			projectDirPath = "";
+			targets = (A00000000000000000000005);
+		};
+		A00000000000000000000002 /* Конфигурации проекта */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000006, A00000000000000000000007);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000003 /* Файлы */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000008,
+				A00000000000000000000009,
+				A0000000000000000000000A,
+				A0000000000000000000000B,
+				A0000000000000000000000C,
+				A0000000000000000000000D,
+				A00000000000000000000004,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (A0000000000000000000000E);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000005 /* NimMDQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A0000000000000000000000F;
+			buildPhases = (A00000000000000000000010, A00000000000000000000011);
+			name = NimMDQuickLook;
+			productName = NimMDQuickLook;
+			productReference = A0000000000000000000000E;
+			productType = "com.apple.product-type.app-extension";
+		};
+		A00000000000000000000006 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {}; };
+		A00000000000000000000007 = {isa = XCBuildConfiguration; name = Release; buildSettings = {}; };
+		A00000000000000000000008 = {isa = PBXFileReference; path = PreviewViewController.swift; lastKnownFileType = sourcecode.swift; sourceTree = "<group>"; };
+		A00000000000000000000009 = {isa = PBXFileReference; path = NimMDBridge.h; lastKnownFileType = sourcecode.c.h; sourceTree = "<group>"; };
+		A0000000000000000000000A = {isa = PBXFileReference; path = Info.plist; lastKnownFileType = text.plist.xml; sourceTree = "<group>"; };
+		A0000000000000000000000B = {isa = PBXFileReference; path = NimMDQuickLook.entitlements; lastKnownFileType = text.plist.entitlements; sourceTree = "<group>"; };
+		A0000000000000000000000C = {isa = PBXFileReference; path = NimMDQuickLook.xcconfig; lastKnownFileType = text.xcconfig; sourceTree = "<group>"; };
+		A0000000000000000000000D = {isa = PBXFileReference; path = "stage-resources.sh"; lastKnownFileType = text.script.sh; sourceTree = "<group>"; };
+		A0000000000000000000000E = {isa = PBXFileReference; path = NimMDQuickLook.appex; explicitFileType = "wrapper.app-extension"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0000000000000000000000F /* Конфигурации таргета */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000012, A00000000000000000000013);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000010 /* Исходники */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A00000000000000000000014);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A00000000000000000000011 /* Ресурсы KaTeX и Mermaid */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			name = "Ресурсы KaTeX и Mermaid";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/bin/bash \"$SRCROOT/stage-resources.sh\"\n";
+		};
+		A00000000000000000000012 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A0000000000000000000000C;
+			buildSettings = { SWIFT_OPTIMIZATION_LEVEL = "-Onone"; };
+			name = Debug;
+		};
+		A00000000000000000000013 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A0000000000000000000000C;
+			buildSettings = { SWIFT_OPTIMIZATION_LEVEL = "-O"; };
+			name = Release;
+		};
+		A00000000000000000000014 = {isa = PBXBuildFile; fileRef = A00000000000000000000008; };
+	};
+	rootObject = A00000000000000000000001;
+}
